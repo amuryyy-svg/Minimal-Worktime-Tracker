@@ -1,0 +1,14 @@
+{
+  "name": "minimal-worktime-tracker",
+  "version": "1.0.0",
+  "description": "Minimal desktop work-time tracker with tray, timer and calendar",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "lint": "node --check src/main.js && node --check src/preload.js && node --check src/renderer/app.js && node --check src/renderer/tracker-core.js && node --check test/tracker-core.test.js",
+    "test": "node test/tracker-core.test.js"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0"
+  }
+}

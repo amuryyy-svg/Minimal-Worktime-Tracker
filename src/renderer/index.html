@@ -1,0 +1,104 @@
+﻿<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Work Tracker</title>
+    <link rel="icon" type="image/png" sizes="any" href="../../Logo.png" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="window-shell">
+      <header class="titlebar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span class="brand-label">Work tracker</span>
+        </div>
+        <div class="window-actions no-drag">
+          <button id="window-minimize" class="window-btn" type="button" aria-label="Свернуть">
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M3 8H13" />
+            </svg>
+          </button>
+          <button id="window-close" class="window-btn" type="button" aria-label="Закрыть">
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M4 4L12 12" />
+              <path d="M12 4L4 12" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <main class="app">
+        <section class="dashboard">
+          <section class="info-strip" aria-label="Состояние трекера">
+            <div id="status-badge" class="info-cell status-cell">Остановлено</div>
+            <div id="streak-value" class="info-cell streak-cell">0 дней подряд</div>
+            <label class="info-cell target-cell no-drag" for="daily-target-hours">
+              <span class="target-label">Цель</span>
+              <input
+                id="daily-target-hours"
+                class="target-input"
+                type="number"
+                min="1"
+                max="24"
+                step="1"
+                inputmode="numeric"
+                aria-label="Дневная норма в часах"
+                value="6"
+              />
+              <span class="target-unit">ч</span>
+            </label>
+          </section>
+          <section
+            id="timer-panel"
+            class="timer-panel"
+            tabindex="0"
+            role="button"
+            aria-pressed="false"
+            aria-label="Запустить или остановить таймер"
+          >
+            <div class="timer-face">
+              <p id="timer-display" class="timer-display">00:00:00</p>
+            </div>
+          </section>
+
+          <section class="calendar-panel">
+            <div class="calendar-header">
+              <button id="prev-month" class="nav-btn" type="button" aria-label="Предыдущий месяц">
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M10 3L5 8L10 13" />
+                </svg>
+              </button>
+              <h1 id="calendar-title">Март 2026</h1>
+              <button id="next-month" class="nav-btn" type="button" aria-label="Следующий месяц">
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M6 3L11 8L6 13" />
+                </svg>
+              </button>
+            </div>
+
+            <div id="weekend-toggle" class="weekend-strip" aria-label="Регулярные выходные"></div>
+            <div id="calendar-grid" class="calendar-grid" aria-label="Календарь"></div>
+          </section>
+
+          <section id="selected-day-panel" class="selection-strip" aria-label="Выбранная дата">
+            <div class="selection-main">
+              <p id="selected-day-label" class="selection-day">23 марта</p>
+              <p id="selected-day-meta" class="selection-meta">0 ч</p>
+            </div>
+            <div class="selection-actions">
+              <button id="toggle-day-off" class="selection-btn" type="button">Выходной</button>
+              <button id="clear-day-override" class="selection-btn" type="button" hidden>Сброс</button>
+              <button id="import-backup" class="selection-btn" type="button">&#x418;&#x43C;&#x43F;&#x43E;&#x440;&#x442;</button>
+              <button id="export-backup" class="selection-btn" type="button">Экспорт</button>
+            </div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <script src="./tracker-core.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
