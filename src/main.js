@@ -189,7 +189,7 @@ function createWindow() {
     frame: false,
     titleBarStyle: "hidden",
     autoHideMenuBar: true,
-    backgroundColor: "#f4f1eb",
+    backgroundColor: "#ffffff",
     icon: appIcon,
     show: false,
     webPreferences: {
