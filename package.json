@@ -1,6 +1,6 @@
 {
   "name": "minimal-worktime-tracker",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Minimal desktop work-time tracker with tray, timer and calendar",
   "main": "src/main.js",
   "scripts": {
