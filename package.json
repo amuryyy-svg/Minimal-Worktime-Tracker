@@ -6,9 +6,31 @@
   "scripts": {
     "start": "electron .",
     "lint": "node --check src/main.js && node --check src/preload.js && node --check src/renderer/app.js && node --check src/renderer/tracker-core.js && node --check test/tracker-core.test.js",
-    "test": "node test/tracker-core.test.js"
+    "test": "node test/tracker-core.test.js",
+    "dist": "electron-builder --win"
+  },
+  "build": {
+    "appId": "com.workflow.minimalworktimetracker",
+    "productName": "Minimal Worktime Tracker",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "src/**/*",
+      "Logo.png",
+      "package.json"
+    ],
+    "npmRebuild": false,
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.ico"
+    }
   },
   "devDependencies": {
-    "electron": "^31.0.0"
+    "electron": "^31.0.0",
+    "electron-builder": "^26.8.1"
   }
 }

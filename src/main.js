@@ -3,6 +3,10 @@ const os = require("os");
 const path = require("path");
 const { app, BrowserWindow, dialog, ipcMain, Menu, Tray, nativeImage, powerMonitor, screen } = require("electron");
 
+const APP_ID = "com.workflow.minimalworktimetracker";
+
+app.setAppUserModelId(APP_ID);
+
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 const trackerCore = require("./renderer/tracker-core.js");
 
