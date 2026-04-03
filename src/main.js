@@ -356,8 +356,18 @@ ipcMain.handle("backup:import", async () => {
 });
 
 ipcMain.handle("data:clear", async () => {
-  await fs.promises.rm(autoBackupPath, { recursive: true, force: true });
-  await fs.promises.mkdir(autoBackupPath, { recursive: true });
+  try {
+    await fs.promises.rm(autoBackupPath, { recursive: true, force: true });
+  } catch (error) {
+    console.warn("Unable to remove auto backup directory.", error);
+  }
+
+  try {
+    await fs.promises.mkdir(autoBackupPath, { recursive: true });
+  } catch (error) {
+    console.warn("Unable to recreate auto backup directory.", error);
+  }
+
   return { cleared: true };
 });
 
