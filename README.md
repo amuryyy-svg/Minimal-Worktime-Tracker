@@ -4,8 +4,6 @@ Minimal Worktime Tracker is a desktop app for tracking work time on Electron.
 
 It is built to keep progress visible rather than hidden. When hours, the calendar, and the current work streak sit in one place, it is easier to keep a steady pace day after day. The value is in accumulation: once progress is visible, it is easier to continue tomorrow than to start from zero again.
 
-![Application screenshot](Фотка.png)
-
 ## What it does
 
 - work time timer
