@@ -1,6 +1,6 @@
 {
   "name": "minimal-worktime-tracker",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Minimal desktop tracker for work time, daily streaks and visible progress",
   "main": "src/main.js",
   "scripts": {
@@ -21,6 +21,10 @@
       "package.json"
     ],
     "npmRebuild": false,
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
     "win": {
       "target": [
         "nsis",

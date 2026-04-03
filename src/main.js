@@ -355,6 +355,12 @@ ipcMain.handle("backup:import", async () => {
   return { canceled: false, filePath, snapshot };
 });
 
+ipcMain.handle("data:clear", async () => {
+  await fs.promises.rm(autoBackupPath, { recursive: true, force: true });
+  await fs.promises.mkdir(autoBackupPath, { recursive: true });
+  return { cleared: true };
+});
+
 powerMonitor.on("suspend", () => {
   sendSystemState("pause");
 });

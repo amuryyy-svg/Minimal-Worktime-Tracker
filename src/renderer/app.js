@@ -238,6 +238,11 @@ LANGUAGE_PACKS.ru.autostartLabel = "\u0410\u0432\u0442\u043e\u0437\u0430\u043f\u
 LANGUAGE_PACKS.ru.autoBackupLabel = "\u0410\u0432\u0442\u043e\u0431\u044d\u043a\u0430\u043f";
 LANGUAGE_PACKS.ru.enabledLabel = "\u0412\u043a\u043b.";
 LANGUAGE_PACKS.ru.disabledLabel = "\u0412\u044b\u043a\u043b.";
+LANGUAGE_PACKS.ru.dataLabel = "\u0414\u0430\u043d\u043d\u044b\u0435";
+LANGUAGE_PACKS.ru.clearDataLabel = "\u041e\u0447\u0438\u0441\u0442\u0438\u0442\u044c \u0434\u0430\u043d\u043d\u044b\u0435";
+LANGUAGE_PACKS.ru.clearDataConfirm = "\u042d\u0442\u043e \u0443\u0434\u0430\u043b\u0438\u0442 \u0432\u0441\u0451 \u0437\u0430\u043f\u0438\u0441\u0430\u043d\u043d\u043e\u0435 \u0432\u0440\u0435\u043c\u044f, \u0441\u0435\u0440\u0438\u044e, \u043d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438 \u0438 \u0430\u0432\u0442\u043e\u0431\u044d\u043a\u0430\u043f\u044b. \u041f\u0440\u043e\u0434\u043e\u043b\u0436\u0438\u0442\u044c?";
+LANGUAGE_PACKS.ru.clearDataSuccess = "\u0414\u0430\u043d\u043d\u044b\u0435 \u043e\u0447\u0438\u0449\u0435\u043d\u044b.";
+LANGUAGE_PACKS.ru.clearDataFailed = "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0447\u0438\u0441\u0442\u0438\u0442\u044c \u0434\u0430\u043d\u043d\u044b\u0435.";
 LANGUAGE_PACKS.en.selectedDayWork = "Workday";
 LANGUAGE_PACKS.en.weekStartLabel = "Week start";
 LANGUAGE_PACKS.en.weekStartMonday = "Monday";
@@ -246,6 +251,11 @@ LANGUAGE_PACKS.en.autostartLabel = "Autostart";
 LANGUAGE_PACKS.en.autoBackupLabel = "Auto backup";
 LANGUAGE_PACKS.en.enabledLabel = "On";
 LANGUAGE_PACKS.en.disabledLabel = "Off";
+LANGUAGE_PACKS.en.dataLabel = "Data";
+LANGUAGE_PACKS.en.clearDataLabel = "Clear data";
+LANGUAGE_PACKS.en.clearDataConfirm = "This will remove all tracked time, streaks, settings, and automatic backups. Continue?";
+LANGUAGE_PACKS.en.clearDataSuccess = "Data cleared.";
+LANGUAGE_PACKS.en.clearDataFailed = "Unable to clear saved data.";
 
 const DEFAULT_DAILY_TARGET_HOURS = 6;
 const MIN_DAILY_TARGET_HOURS = 1;
@@ -291,6 +301,8 @@ const el = {
   settingsAutoBackupLabel: document.getElementById("settings-auto-backup-label"),
   settingsAutoBackupOff: document.getElementById("settings-auto-backup-off"),
   settingsAutoBackupOn: document.getElementById("settings-auto-backup-on"),
+  settingsDataLabel: document.getElementById("settings-data-label"),
+  settingsClearData: document.getElementById("settings-clear-data"),
   exportBackup: document.getElementById("export-backup"),
   importBackup: document.getElementById("import-backup"),
 };
@@ -378,6 +390,25 @@ function persistState() {
   } catch (error) {
     console.error("Unable to persist tracker state.", error);
     return false;
+  }
+}
+
+function cancelScheduledSave() {
+  if (!saveTimeout) {
+    return;
+  }
+
+  clearTimeout(saveTimeout);
+  saveTimeout = null;
+}
+
+function removePersistedStateKeys() {
+  for (const key of LEGACY_STORAGE_KEYS) {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // Ignore storage cleanup failures; the fresh state will still be written.
+    }
   }
 }
 
@@ -711,6 +742,8 @@ function renderStaticText() {
   el.settingsAutoBackupLabel.textContent = ui.autoBackupLabel;
   el.settingsAutoBackupOff.textContent = ui.disabledLabel;
   el.settingsAutoBackupOn.textContent = ui.enabledLabel;
+  el.settingsDataLabel.textContent = ui.dataLabel;
+  el.settingsClearData.textContent = ui.clearDataLabel;
   el.importBackup.textContent = ui.importBackup;
   el.exportBackup.textContent = ui.exportBackup;
 }
@@ -924,6 +957,39 @@ function setAutoBackup(enabled) {
   syncSettingsState();
 }
 
+async function clearStoredData() {
+  const ui = getUiText();
+
+  if (!window.confirm(ui.clearDataConfirm)) {
+    return;
+  }
+
+  const clearData = window.desktopAPI?.clearData;
+  if (typeof clearData !== "function") {
+    throw new Error("clearData API is not available.");
+  }
+
+  el.settingsClearData.disabled = true;
+
+  try {
+    cancelScheduledSave();
+    await clearData();
+    removePersistedStateKeys();
+    calendarCursor = startOfMonth(new Date());
+    selectedDate = startOfDay(new Date());
+    lastAutoBackupDateKey = null;
+    applyPersistedState(createDefaultPersistedState());
+    closeSettingsPanel();
+    window.alert(ui.clearDataSuccess);
+  } catch (error) {
+    console.error("Unable to clear tracker data.", error);
+    scheduleSave();
+    window.alert(ui.clearDataFailed);
+  } finally {
+    el.settingsClearData.disabled = false;
+  }
+}
+
 function syncSettingsState() {
   window.desktopAPI?.sendSettingsState?.({
     language: settings.language,
@@ -1108,6 +1174,9 @@ el.settingsAutostartOff.addEventListener("click", () => setAutostart(false));
 el.settingsAutostartOn.addEventListener("click", () => setAutostart(true));
 el.settingsAutoBackupOff.addEventListener("click", () => setAutoBackup(false));
 el.settingsAutoBackupOn.addEventListener("click", () => setAutoBackup(true));
+el.settingsClearData.addEventListener("click", async () => {
+  await clearStoredData();
+});
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !el.settingsOverlay.hidden) {
     closeSettingsPanel();

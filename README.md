@@ -13,6 +13,7 @@ It is built to keep progress visible rather than hidden. When hours, the calenda
 - Windows autostart
 - tray integration
 - automatic backups
+- clear saved data from settings
 - language, week start, and date format settings
 
 ## Run
@@ -34,3 +35,5 @@ Windows build artifacts will appear in `release/`:
 
 - `*.exe` installer for installation
 - `*.exe` portable build for running without installation
+
+The Windows installer includes a step for choosing the installation folder.

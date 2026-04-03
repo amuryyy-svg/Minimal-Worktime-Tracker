@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld("desktopAPI", {
     ipcRenderer.on("system-state", handler);
     return () => ipcRenderer.off("system-state", handler);
   },
+  clearData: () => ipcRenderer.invoke("data:clear"),
   exportBackup: (payload) => ipcRenderer.invoke("backup:export", payload),
   autoBackup: (payload) => ipcRenderer.invoke("backup:auto", payload),
   importBackup: () => ipcRenderer.invoke("backup:import"),
