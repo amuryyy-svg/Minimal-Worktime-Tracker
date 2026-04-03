@@ -1,38 +1,38 @@
-# Worktime Tracker
+# Minimal Worktime Tracker
 
-Минималистичное desktop-приложение для учета рабочего времени на Electron.
+Minimal Worktime Tracker is a desktop app for tracking work time on Electron.
 
-Worktime Tracker создан не ради контроля, а чтобы делать прогресс видимым. Когда часы, календарь и серия рабочих дней складываются в один экран, проще держать ритм изо дня в день. Такой формат помогает не терять темп: накопленный результат заметен сразу, и проще продолжить завтра, чем каждый раз начинать с нуля.
+It is built to keep progress visible rather than hidden. When hours, the calendar, and the current work streak sit in one place, it is easier to keep a steady pace day after day. The value is in accumulation: once progress is visible, it is easier to continue tomorrow than to start from zero again.
 
-![Скриншот приложения](Фотка.png)
+![Application screenshot](Фотка.png)
 
-## Что умеет
+## What it does
 
-- таймер рабочего времени
-- календарь с прогрессом по дням
-- серия рабочих дней подряд
-- пометка выходных
-- автозапуск с Windows
-- сворачивание в трей
-- авто-бэкапы
-- выбор языка, начала недели и формата даты
+- work time timer
+- calendar with per-day progress
+- consecutive workday streak
+- day-off marking
+- Windows autostart
+- tray integration
+- automatic backups
+- language, week start, and date format settings
 
-## Запуск
+## Run
 
 ```bash
 npm install
 npm start
 ```
 
-После запуска закройте окно через `X`, и приложение останется в трее.
+After launch, close the window with `X` and the app will stay in the tray.
 
-## Сборка
+## Build
 
 ```bash
 npm run dist
 ```
 
-Артефакты Windows-сборки появятся в `release/`:
+Windows build artifacts will appear in `release/`:
 
-- `*.exe` installer для установки
-- `*.exe` portable-версия для запуска без установки
+- `*.exe` installer for installation
+- `*.exe` portable build for running without installation
