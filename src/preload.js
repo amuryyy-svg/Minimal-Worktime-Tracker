@@ -1,7 +1,8 @@
-﻿const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("desktopAPI", {
   sendTimerState: (payload) => ipcRenderer.send("timer-state", payload),
+  sendSettingsState: (payload) => ipcRenderer.send("settings-state", payload),
   onTrayCommand: (callback) => {
     const handler = (_event, command) => callback(command);
     ipcRenderer.on("tray-command", handler);
@@ -13,6 +14,7 @@ contextBridge.exposeInMainWorld("desktopAPI", {
     return () => ipcRenderer.off("system-state", handler);
   },
   exportBackup: (payload) => ipcRenderer.invoke("backup:export", payload),
+  autoBackup: (payload) => ipcRenderer.invoke("backup:auto", payload),
   importBackup: () => ipcRenderer.invoke("backup:import"),
   minimizeWindow: () => ipcRenderer.send("window:minimize"),
   closeWindow: () => ipcRenderer.send("window:close"),

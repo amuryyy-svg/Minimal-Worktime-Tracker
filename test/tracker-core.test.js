@@ -1,4 +1,4 @@
-﻿const assert = require("node:assert/strict");
+const assert = require("node:assert/strict");
 const trackerCore = require("../src/renderer/tracker-core.js");
 
 {
@@ -56,6 +56,16 @@ const trackerCore = require("../src/renderer/tracker-core.js");
 }
 
 {
+  assert.equal(trackerCore.sanitizeDateFormat("mdy"), "mdy");
+  assert.equal(trackerCore.sanitizeDateFormat("bad"), "localized");
+  assert.equal(trackerCore.sanitizeWeekStart("sunday"), "sunday");
+  assert.equal(trackerCore.sanitizeWeekStart("bad"), "monday");
+  assert.equal(trackerCore.sanitizeBoolean(true), true);
+  assert.equal(trackerCore.sanitizeBoolean(undefined, true), true);
+  assert.equal(trackerCore.sanitizeBoolean("bad"), false);
+}
+
+{
   const persisted = trackerCore.createPersistedState({
     logs: {
       [trackerCore.dateKey(new Date(2026, 0, 1))]: { workMs: "1800000" },
@@ -68,6 +78,11 @@ const trackerCore = require("../src/renderer/tracker-core.js");
         [trackerCore.dateKey(new Date(2026, 0, 2))]: "off",
         [trackerCore.dateKey(new Date(2026, 0, 3))]: "invalid",
       },
+      language: "en",
+      dateFormat: "mdy",
+      weekStart: "sunday",
+      autostart: 1,
+      autoBackup: "false",
     },
     timerState: {
       isRunning: 1,
@@ -81,6 +96,11 @@ const trackerCore = require("../src/renderer/tracker-core.js");
   assert.deepEqual(persisted.settings.dayOverrides, {
     [trackerCore.dateKey(new Date(2026, 0, 2))]: "off",
   });
+  assert.equal(persisted.settings.language, "en");
+  assert.equal(persisted.settings.dateFormat, "mdy");
+  assert.equal(persisted.settings.weekStart, "sunday");
+  assert.equal(persisted.settings.autostart, true);
+  assert.equal(persisted.settings.autoBackup, false);
   assert.equal(persisted.timerState.isRunning, true);
 }
 
@@ -91,6 +111,11 @@ const trackerCore = require("../src/renderer/tracker-core.js");
       dailyTargetHours: 6,
       weekendDays: [0, 6],
       dayOverrides: {},
+      language: "ru",
+      dateFormat: "localized",
+      weekStart: "sunday",
+      autostart: true,
+      autoBackup: false,
     },
     timerState: {
       isRunning: false,
@@ -104,6 +129,7 @@ const trackerCore = require("../src/renderer/tracker-core.js");
       },
       settings: {
         dailyTargetHours: 7,
+        language: "en",
       },
     },
     fallbackState,
@@ -113,6 +139,71 @@ const trackerCore = require("../src/renderer/tracker-core.js");
   assert.equal(normalized.timerState.isRunning, false);
   assert.equal(normalized.logs[trackerCore.dateKey(new Date(2026, 0, 4))].workMs, 120_000);
   assert.equal(normalized.settings.dailyTargetHours, 7);
+  assert.equal(normalized.settings.language, "en");
+  assert.equal(normalized.settings.weekStart, "sunday");
+  assert.equal(normalized.settings.autostart, true);
+  assert.equal(normalized.settings.autoBackup, false);
+}
+
+{
+  const normalized = trackerCore.normalizePersistedState(
+    {
+      settings: {
+        dateFormat: "bad",
+      },
+    },
+    {
+      logs: {},
+      settings: {
+        dailyTargetHours: 6,
+        weekendDays: [0, 6],
+        dayOverrides: {},
+        language: "ru",
+        dateFormat: "localized",
+        weekStart: "sunday",
+        autostart: true,
+        autoBackup: false,
+      },
+      timerState: {
+        isRunning: false,
+      },
+    },
+  );
+
+  assert.equal(normalized.settings.dateFormat, "localized");
+  assert.equal(normalized.settings.weekStart, "sunday");
+  assert.equal(normalized.settings.autostart, true);
+  assert.equal(normalized.settings.autoBackup, false);
+}
+
+{
+  const normalized = trackerCore.normalizePersistedState(
+    {
+      settings: {
+        language: "de",
+      },
+    },
+    {
+      logs: {},
+      settings: {
+        dailyTargetHours: 6,
+        weekendDays: [0, 6],
+        dayOverrides: {},
+        language: "ru",
+        weekStart: "monday",
+        autostart: false,
+        autoBackup: false,
+      },
+      timerState: {
+        isRunning: false,
+      },
+    },
+  );
+
+  assert.equal(normalized.settings.language, "ru");
+  assert.equal(normalized.settings.weekStart, "monday");
+  assert.equal(normalized.settings.autostart, false);
+  assert.equal(normalized.settings.autoBackup, false);
 }
 
 {
@@ -122,6 +213,10 @@ const trackerCore = require("../src/renderer/tracker-core.js");
       dailyTargetHours: 6,
       weekendDays: [0, 6],
       dayOverrides: {},
+      language: "ru",
+      weekStart: "monday",
+      autostart: false,
+      autoBackup: false,
     },
     timerState: {
       isRunning: false,
@@ -140,6 +235,10 @@ const trackerCore = require("../src/renderer/tracker-core.js");
       dailyTargetHours: 6,
       weekendDays: [0, 6],
       dayOverrides: {},
+      language: "en",
+      weekStart: "monday",
+      autostart: false,
+      autoBackup: false,
     },
     timerState: {
       isRunning: true,
@@ -151,6 +250,10 @@ const trackerCore = require("../src/renderer/tracker-core.js");
       dailyTargetHours: 6,
       weekendDays: [0, 6],
       dayOverrides: {},
+      language: "ru",
+      weekStart: "monday",
+      autostart: false,
+      autoBackup: false,
     },
     timerState: {
       isRunning: false,
@@ -159,4 +262,8 @@ const trackerCore = require("../src/renderer/tracker-core.js");
 
   assert.equal(restored.version, trackerCore.PERSISTED_STATE_VERSION);
   assert.equal(restored.timerState.isRunning, true);
+  assert.equal(restored.settings.language, "en");
+  assert.equal(restored.settings.weekStart, "monday");
+  assert.equal(restored.settings.autostart, false);
+  assert.equal(restored.settings.autoBackup, false);
 }

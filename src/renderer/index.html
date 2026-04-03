@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
@@ -15,6 +15,11 @@
           <span class="brand-label">Work tracker</span>
         </div>
         <div class="window-actions no-drag">
+          <button id="window-settings" class="window-btn" type="button" aria-label="Настройки">
+            <svg viewBox="0 0 16 16" aria-hidden="true">
+              <path d="M8 1.75V3.25M8 12.75V14.25M1.75 8H3.25M12.75 8H14.25M3.14 3.14L4.2 4.2M11.8 11.8L12.86 12.86M11.8 4.2L12.86 3.14M3.14 12.86L4.2 11.8M8 5.4A2.6 2.6 0 1 1 8 10.6A2.6 2.6 0 0 1 8 5.4Z" />
+            </svg>
+          </button>
           <button id="window-minimize" class="window-btn" type="button" aria-label="Свернуть">
             <svg viewBox="0 0 16 16" aria-hidden="true">
               <path d="M3 8H13" />
@@ -89,14 +94,70 @@
             </div>
             <div class="selection-actions">
               <button id="toggle-day-off" class="selection-btn" type="button">Выходной</button>
-              <button id="clear-day-override" class="selection-btn" type="button" hidden>Сброс</button>
-              <button id="import-backup" class="selection-btn" type="button">&#x418;&#x43C;&#x43F;&#x43E;&#x440;&#x442;</button>
+              <button id="import-backup" class="selection-btn" type="button">Импорт</button>
               <button id="export-backup" class="selection-btn" type="button">Экспорт</button>
             </div>
           </section>
         </section>
       </main>
-    </div>
+
+      <div id="settings-overlay" class="settings-overlay" hidden>
+        <button id="settings-backdrop" class="settings-backdrop" type="button" aria-label="&#1047;&#1072;&#1082;&#1088;&#1099;&#1090;&#1100; &#1085;&#1072;&#1089;&#1090;&#1088;&#1086;&#1081;&#1082;&#1080;"></button>
+        <section class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+          <header class="settings-header">
+            <h2 id="settings-title">&#1053;&#1072;&#1089;&#1090;&#1088;&#1086;&#1081;&#1082;&#1080;</h2>
+            <button id="settings-close" class="window-btn settings-close" type="button" aria-label="&#1047;&#1072;&#1082;&#1088;&#1099;&#1090;&#1100; &#1085;&#1072;&#1089;&#1090;&#1088;&#1086;&#1081;&#1082;&#1080;">
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M4 4L12 12" />
+                <path d="M12 4L4 12" />
+              </svg>
+            </button>
+          </header>
+
+          <div class="settings-body">
+            <section class="settings-section">
+              <p id="settings-language-label" class="settings-label">Language</p>
+              <div class="settings-toggle" role="radiogroup" aria-labelledby="settings-language-label">
+                <button id="settings-language-ru" class="settings-option" type="button" aria-pressed="true">Russian</button>
+                <button id="settings-language-en" class="settings-option" type="button" aria-pressed="false">English</button>
+              </div>
+            </section>
+
+            <section class="settings-section">
+              <p id="settings-date-format-label" class="settings-label">Date format</p>
+              <div class="settings-toggle settings-toggle--triple" role="radiogroup" aria-labelledby="settings-date-format-label">
+                <button id="settings-date-format-localized" class="settings-option" type="button" aria-pressed="true">Localized</button>
+                <button id="settings-date-format-dmy" class="settings-option" type="button" aria-pressed="false">DD.MM.YYYY</button>
+                <button id="settings-date-format-mdy" class="settings-option" type="button" aria-pressed="false">MM/DD/YYYY</button>
+              </div>
+            </section>
+
+            <section class="settings-section">
+              <p id="settings-week-start-label" class="settings-label">Week start</p>
+              <div class="settings-toggle" role="radiogroup" aria-labelledby="settings-week-start-label">
+                <button id="settings-week-start-monday" class="settings-option" type="button" aria-pressed="true">Monday</button>
+                <button id="settings-week-start-sunday" class="settings-option" type="button" aria-pressed="false">Sunday</button>
+              </div>
+            </section>
+
+            <section class="settings-section">
+              <p id="settings-autostart-label" class="settings-label">Autostart</p>
+              <div class="settings-toggle" role="radiogroup" aria-labelledby="settings-autostart-label">
+                <button id="settings-autostart-off" class="settings-option" type="button" aria-pressed="true">Off</button>
+                <button id="settings-autostart-on" class="settings-option" type="button" aria-pressed="false">On</button>
+              </div>
+            </section>
+
+            <section class="settings-section">
+              <p id="settings-auto-backup-label" class="settings-label">Auto backup</p>
+              <div class="settings-toggle" role="radiogroup" aria-labelledby="settings-auto-backup-label">
+                <button id="settings-auto-backup-off" class="settings-option" type="button" aria-pressed="true">Off</button>
+                <button id="settings-auto-backup-on" class="settings-option" type="button" aria-pressed="false">On</button>
+              </div>
+            </section>
+          </div>
+        </section>
+      </div>
 
     <script src="./tracker-core.js"></script>
     <script src="./app.js"></script>

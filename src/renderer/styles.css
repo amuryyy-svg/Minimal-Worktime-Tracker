@@ -49,6 +49,7 @@ button,
 
 .window-shell {
   height: 100%;
+  position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
@@ -592,6 +593,135 @@ button,
 
 .selection-btn[hidden] {
   display: none !important;
+}
+
+.settings-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: rgb(10 14 12 / 0.18);
+}
+
+.settings-overlay[hidden] {
+  display: none !important;
+}
+
+.settings-backdrop {
+  position: absolute;
+  inset: 0;
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: default;
+}
+
+.settings-panel {
+  position: relative;
+  z-index: 1;
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
+  width: min(100%, 400px);
+  max-width: 400px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--shell);
+  box-shadow: 0 20px 40px rgb(0 0 0 / 0.12);
+}
+
+.settings-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--chrome-cell);
+  align-items: stretch;
+  min-height: var(--chrome-cell);
+  border-bottom: 1px solid var(--line);
+}
+
+#settings-title {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+.settings-close {
+  width: 100%;
+  height: 100%;
+  border-left: 1px solid var(--line);
+}
+
+.settings-body {
+  display: grid;
+  gap: 14px;
+  padding: 14px 16px 16px;
+}
+
+.settings-section {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-label {
+  margin: 0;
+  color: var(--text-soft);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.settings-toggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--shell);
+}
+
+.settings-toggle--triple {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.settings-option {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  background: var(--shell);
+  color: var(--text-soft);
+  font: inherit;
+  text-align: center;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: color 140ms ease, background-color 140ms ease;
+}
+
+.settings-option + .settings-option {
+  border-left: 1px solid var(--line);
+}
+
+.settings-option:hover {
+  background: rgba(18, 22, 20, 0.04);
+  color: var(--text);
+}
+
+.settings-option.active {
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 
 @media (max-width: 500px) {

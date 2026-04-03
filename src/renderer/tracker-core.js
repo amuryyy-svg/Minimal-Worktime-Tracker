@@ -1,4 +1,4 @@
-﻿(function (root, factory) {
+(function (root, factory) {
   if (typeof module === "object" && module.exports) {
     module.exports = factory();
     return;
@@ -118,7 +118,10 @@
   }
 
   const DEFAULT_WEEKEND_DAYS = [0, 6];
-  const PERSISTED_STATE_VERSION = 4;
+  const DEFAULT_LANGUAGE = "ru";
+  const DEFAULT_DATE_FORMAT = "localized";
+  const DEFAULT_WEEK_START = "monday";
+  const PERSISTED_STATE_VERSION = 7;
 
   function sanitizeDailyTargetHours(value, fallback = 6, min = 1, max = 24) {
     const parsed = Number(value);
@@ -168,6 +171,52 @@
     return dayOverrides;
   }
 
+  function sanitizeLanguage(value, fallback = DEFAULT_LANGUAGE) {
+    if (value === "ru" || value === "en") {
+      return value;
+    }
+
+    return fallback;
+  }
+
+  function sanitizeWeekStart(value, fallback = DEFAULT_WEEK_START) {
+    if (value === "monday" || value === "sunday") {
+      return value;
+    }
+
+    return fallback;
+  }
+
+  function sanitizeDateFormat(value, fallback = DEFAULT_DATE_FORMAT) {
+    if (value === "localized" || value === "dmy" || value === "mdy") {
+      return value;
+    }
+
+    return fallback;
+  }
+
+  function sanitizeBoolean(value, fallback = false) {
+    if (typeof value === "boolean") {
+      return value;
+    }
+
+    if (value === 0 || value === 1) {
+      return Boolean(value);
+    }
+
+    if (typeof value === "string") {
+      if (value === "true" || value === "1") {
+        return true;
+      }
+
+      if (value === "false" || value === "0") {
+        return false;
+      }
+    }
+
+    return fallback;
+  }
+
   function sanitizeLogs(value) {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
       return {};
@@ -201,6 +250,11 @@
     );
     const fallbackWeekendDays = sanitizeWeekendDays(normalizedFallback.weekendDays, DEFAULT_WEEKEND_DAYS);
     const fallbackDayOverrides = sanitizeDayOverrides(normalizedFallback.dayOverrides);
+    const fallbackLanguage = sanitizeLanguage(normalizedFallback.language, DEFAULT_LANGUAGE);
+    const fallbackDateFormat = sanitizeDateFormat(normalizedFallback.dateFormat, DEFAULT_DATE_FORMAT);
+    const fallbackWeekStart = sanitizeWeekStart(normalizedFallback.weekStart, DEFAULT_WEEK_START);
+    const fallbackAutostart = sanitizeBoolean(normalizedFallback.autostart, false);
+    const fallbackAutoBackup = sanitizeBoolean(normalizedFallback.autoBackup, false);
 
     return {
       dailyTargetHours: sanitizeDailyTargetHours(
@@ -215,6 +269,21 @@
       dayOverrides: source.dayOverrides === undefined
         ? fallbackDayOverrides
         : sanitizeDayOverrides(source.dayOverrides),
+      language: source.language === undefined
+        ? fallbackLanguage
+        : sanitizeLanguage(source.language, fallbackLanguage),
+      dateFormat: source.dateFormat === undefined
+        ? fallbackDateFormat
+        : sanitizeDateFormat(source.dateFormat, fallbackDateFormat),
+      weekStart: source.weekStart === undefined
+        ? fallbackWeekStart
+        : sanitizeWeekStart(source.weekStart, fallbackWeekStart),
+      autostart: source.autostart === undefined
+        ? fallbackAutostart
+        : sanitizeBoolean(source.autostart, fallbackAutostart),
+      autoBackup: source.autoBackup === undefined
+        ? fallbackAutoBackup
+        : sanitizeBoolean(source.autoBackup, fallbackAutoBackup),
     };
   }
 
@@ -245,6 +314,11 @@
         dailyTargetHours: 6,
         weekendDays: DEFAULT_WEEKEND_DAYS,
         dayOverrides: {},
+        language: DEFAULT_LANGUAGE,
+        dateFormat: DEFAULT_DATE_FORMAT,
+        weekStart: DEFAULT_WEEK_START,
+        autostart: false,
+        autoBackup: false,
       },
       timerState: { isRunning: false },
     });
@@ -363,12 +437,15 @@
     isSameDay,
     isSameMonth,
     sanitizeDailyTargetHours,
+    sanitizeBoolean,
     createBackupPayload,
     createPersistedState,
     normalizePersistedState,
     sanitizeDayOverrides,
+    sanitizeDateFormat,
     sanitizeLogs,
     sanitizeSettings,
+    sanitizeWeekStart,
     sanitizeTimerState,
     sanitizeWeekendDays,
     PERSISTED_STATE_VERSION,

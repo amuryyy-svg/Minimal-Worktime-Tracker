@@ -10,6 +10,27 @@ app.setAppUserModelId(APP_ID);
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 const trackerCore = require("./renderer/tracker-core.js");
 
+const TRAY_TEXT = {
+  ru: {
+    openWindow: "\u041e\u0442\u043a\u0440\u044b\u0442\u044c",
+    hideWindow: "\u0421\u043a\u0440\u044b\u0442\u044c",
+    startTimer: "\u0417\u0430\u043f\u0443\u0441\u0442\u0438\u0442\u044c",
+    stopTimer: "\u041e\u0441\u0442\u0430\u043d\u043e\u0432\u0438\u0442\u044c",
+    exit: "\u0412\u044b\u0445\u043e\u0434",
+    tooltipRunning: "\u0418\u0434\u0451\u0442 \u0440\u0430\u0431\u043e\u0447\u0435\u0435 \u0432\u0440\u0435\u043c\u044f",
+    tooltipIdle: "\u0422\u0440\u0435\u043a\u0435\u0440 \u0440\u0430\u0431\u043e\u0447\u0435\u0433\u043e \u0432\u0440\u0435\u043c\u0435\u043d\u0438",
+  },
+  en: {
+    openWindow: "Show",
+    hideWindow: "Hide",
+    startTimer: "Start",
+    stopTimer: "Stop",
+    exit: "Exit",
+    tooltipRunning: "Work time is running",
+    tooltipIdle: "Work time tracker",
+  },
+};
+
 if (!gotSingleInstanceLock) {
   app.quit();
   process.exit(0);
@@ -40,7 +61,8 @@ const userDataPath = path.join(dataRoot, "user-data");
 const sessionDataPath = path.join(dataRoot, "session-data");
 const cachePath = path.join(dataRoot, "cache");
 
-for (const dir of [userDataPath, sessionDataPath, cachePath]) {
+const autoBackupPath = path.join(userDataPath, "backups");
+for (const dir of [userDataPath, sessionDataPath, cachePath, autoBackupPath]) {
   fs.mkdirSync(dir, { recursive: true });
 }
 
@@ -58,16 +80,28 @@ if (appIcon.isEmpty()) {
 let mainWindow;
 let tray;
 let isQuitting = false;
+const shouldStartHidden = app.getLoginItemSettings().wasOpenedAtLogin === true;
 
 const trayState = {
   isRunning: false,
+  language: "ru",
 };
 
-const TRAY_WINDOW_GAP = 8;
 const WINDOW_SCREEN_MARGIN = 12;
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(value, max));
+}
+
+function getTrayText() {
+  return TRAY_TEXT[trayState.language] ?? TRAY_TEXT.ru;
+}
+
+function applyAutostartSetting(enabled) {
+  app.setLoginItemSettings({
+    openAtLogin: Boolean(enabled),
+    openAsHidden: Boolean(enabled),
+  });
 }
 
 function createTrayIcon() {
@@ -93,26 +127,20 @@ function sendSystemState(state) {
   mainWindow.webContents.send("system-state", state);
 }
 
-function positionMainWindowNearTray(trayBounds = tray?.getBounds()) {
+function positionMainWindowBottomRight(trayBounds = tray?.getBounds()) {
   if (!mainWindow || mainWindow.isDestroyed()) {
     return;
   }
 
-  if (!trayBounds || trayBounds.width <= 0 || trayBounds.height <= 0) {
-    return;
-  }
-
   const windowBounds = mainWindow.getBounds();
-  const display = screen.getDisplayMatching(trayBounds);
+  const display = trayBounds ? screen.getDisplayMatching(trayBounds) : screen.getPrimaryDisplay();
   const workArea = display.workArea;
   const minX = workArea.x + WINDOW_SCREEN_MARGIN;
   const maxX = workArea.x + workArea.width - windowBounds.width - WINDOW_SCREEN_MARGIN;
   const minY = workArea.y + WINDOW_SCREEN_MARGIN;
   const maxY = workArea.y + workArea.height - windowBounds.height - WINDOW_SCREEN_MARGIN;
-  const x = clamp(Math.round(trayBounds.x + trayBounds.width - windowBounds.width), minX, maxX);
-  const aboveTrayY = trayBounds.y - windowBounds.height - TRAY_WINDOW_GAP;
-  const belowTrayY = trayBounds.y + trayBounds.height + TRAY_WINDOW_GAP;
-  const y = clamp(aboveTrayY >= minY ? aboveTrayY : belowTrayY, minY, maxY);
+  const x = clamp(workArea.x + workArea.width - windowBounds.width - WINDOW_SCREEN_MARGIN, minX, maxX);
+  const y = clamp(workArea.y + workArea.height - windowBounds.height - WINDOW_SCREEN_MARGIN, minY, maxY);
 
   mainWindow.setPosition(x, y, false);
 }
@@ -126,7 +154,7 @@ function showMainWindow(trayBounds) {
     mainWindow.restore();
   }
 
-  positionMainWindowNearTray(trayBounds);
+  positionMainWindowBottomRight(trayBounds);
   mainWindow.show();
   mainWindow.focus();
 }
@@ -157,18 +185,19 @@ function updateTrayMenu() {
     return;
   }
 
+  const text = getTrayText();
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: mainWindow?.isVisible() ? "Скрыть" : "Открыть",
+      label: mainWindow?.isVisible() ? text.hideWindow : text.openWindow,
       click: () => toggleWindow(),
     },
     {
-      label: trayState.isRunning ? "Остановить" : "Запустить",
+      label: trayState.isRunning ? text.stopTimer : text.startTimer,
       click: () => sendTrayCommand("toggle-run"),
     },
     { type: "separator" },
     {
-      label: "Выход",
+      label: text.exit,
       click: () => {
         isQuitting = true;
         app.quit();
@@ -177,7 +206,7 @@ function updateTrayMenu() {
   ]);
 
   tray.setContextMenu(contextMenu);
-  tray.setToolTip(trayState.isRunning ? "Идёт рабочее время" : "Трекер рабочего времени");
+  tray.setToolTip(trayState.isRunning ? text.tooltipRunning : text.tooltipIdle);
 }
 
 function createWindow() {
@@ -202,6 +231,11 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, "renderer/index.html"));
 
   mainWindow.once("ready-to-show", () => {
+    if (shouldStartHidden) {
+      mainWindow.setSkipTaskbar(true);
+      return;
+    }
+
     showMainWindow();
   });
 
@@ -233,6 +267,16 @@ function createTray() {
 
 ipcMain.on("timer-state", (_event, payload) => {
   trayState.isRunning = Boolean(payload?.isRunning);
+  updateTrayMenu();
+});
+
+ipcMain.on("settings-state", (_event, payload) => {
+  trayState.language = payload?.language === "en" ? "en" : "ru";
+
+  if (typeof payload?.autostart === "boolean") {
+    applyAutostartSetting(payload.autostart);
+  }
+
   updateTrayMenu();
 });
 
@@ -268,6 +312,16 @@ ipcMain.handle("backup:export", async (_event, snapshot) => {
 
   await fs.promises.writeFile(filePath, JSON.stringify(snapshot, null, 2), "utf8");
   return { canceled: false, filePath };
+});
+
+ipcMain.handle("backup:auto", async (_event, snapshot) => {
+  if (!snapshot || typeof snapshot !== "object") {
+    throw new TypeError("backup:auto expects a snapshot object.");
+  }
+
+  const filePath = path.join(autoBackupPath, "work-tracker-auto-backup-" + trackerCore.dateKey(new Date()) + ".json");
+  await fs.promises.writeFile(filePath, JSON.stringify(snapshot, null, 2), "utf8");
+  return { saved: true, filePath };
 });
 
 ipcMain.handle("backup:import", async () => {
