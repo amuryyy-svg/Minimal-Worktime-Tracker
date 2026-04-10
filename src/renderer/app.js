@@ -1,13 +1,3 @@
-const STORAGE_KEY = "minimal-worktime-tracker.v7";
-const LEGACY_STORAGE_KEYS = [
-  STORAGE_KEY,
-  "minimal-worktime-tracker.v6",
-  "minimal-worktime-tracker.v5",
-  "minimal-worktime-tracker.v4",
-  "minimal-worktime-tracker.v3",
-  "minimal-worktime-tracker.v2",
-  "minimal-worktime-tracker.v1",
-];
 const DEFAULT_WEEK_START = "monday";
 const DEFAULT_LANGUAGE = "ru";
 const DEFAULT_DATE_FORMAT = "localized";
@@ -244,6 +234,8 @@ LANGUAGE_PACKS.ru.clearDataConfirm = "\u042d\u0442\u043e \u0443\u0434\u0430\u043
 LANGUAGE_PACKS.ru.clearDataConfirmLabel = "\u041e\u0447\u0438\u0441\u0442\u0438\u0442\u044c \u0435\u0449\u0451 \u0440\u0430\u0437";
 LANGUAGE_PACKS.ru.clearDataSuccess = "\u0414\u0430\u043d\u043d\u044b\u0435 \u043e\u0447\u0438\u0449\u0435\u043d\u044b.";
 LANGUAGE_PACKS.ru.clearDataFailed = "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u043e\u0447\u0438\u0441\u0442\u0438\u0442\u044c \u0434\u0430\u043d\u043d\u044b\u0435.";
+LANGUAGE_PACKS.ru.autostartFailed = "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0438\u0437\u043c\u0435\u043d\u0438\u0442\u044c \u0430\u0432\u0442\u043e\u0437\u0430\u043f\u0443\u0441\u043a.";
+LANGUAGE_PACKS.ru.cancelLabel = "\u041e\u0442\u043c\u0435\u043d\u0430";
 LANGUAGE_PACKS.en.selectedDayWork = "Workday";
 LANGUAGE_PACKS.en.weekStartLabel = "Week start";
 LANGUAGE_PACKS.en.weekStartMonday = "Monday";
@@ -258,6 +250,20 @@ LANGUAGE_PACKS.en.clearDataConfirm = "This will remove all tracked time, streaks
 LANGUAGE_PACKS.en.clearDataConfirmLabel = "Clear again";
 LANGUAGE_PACKS.en.clearDataSuccess = "Data cleared.";
 LANGUAGE_PACKS.en.clearDataFailed = "Unable to clear saved data.";
+LANGUAGE_PACKS.en.autostartFailed = "Unable to change autostart.";
+LANGUAGE_PACKS.en.cancelLabel = "Cancel";
+LANGUAGE_PACKS.ru.clearDayLabel = "Очистить день";
+LANGUAGE_PACKS.ru.clearDayConfirmTitle = "Очистить день";
+LANGUAGE_PACKS.ru.clearDayConfirmMessage = "Будет очищено только учтённое время выбранного дня. Статус дня не изменится.";
+LANGUAGE_PACKS.ru.clearDayConfirmAction = "Очистить";
+LANGUAGE_PACKS.ru.clearDayBlockedRunning = "Остановите таймер перед очисткой сегодняшнего дня.";
+LANGUAGE_PACKS.ru.clearDaySuccess = "Время выбранного дня очищено.";
+LANGUAGE_PACKS.en.clearDayLabel = "Clear day";
+LANGUAGE_PACKS.en.clearDayConfirmTitle = "Clear day";
+LANGUAGE_PACKS.en.clearDayConfirmMessage = "Only the tracked time for the selected day will be cleared. The day status will stay the same.";
+LANGUAGE_PACKS.en.clearDayConfirmAction = "Clear";
+LANGUAGE_PACKS.en.clearDayBlockedRunning = "Stop the timer before clearing today.";
+LANGUAGE_PACKS.en.clearDaySuccess = "Selected day time cleared.";
 
 const DEFAULT_DAILY_TARGET_HOURS = 6;
 const MIN_DAILY_TARGET_HOURS = 1;
@@ -280,6 +286,7 @@ const el = {
   selectedDayLabel: document.getElementById("selected-day-label"),
   selectedDayMeta: document.getElementById("selected-day-meta"),
   toggleDayOff: document.getElementById("toggle-day-off"),
+  clearDay: document.getElementById("clear-day"),
   minimizeWindow: document.getElementById("window-minimize"),
   closeWindow: document.getElementById("window-close"),
   settingsButton: document.getElementById("window-settings"),
@@ -308,30 +315,39 @@ const el = {
   exportBackup: document.getElementById("export-backup"),
   appToast: document.getElementById("app-toast"),
   importBackup: document.getElementById("import-backup"),
+  confirmOverlay: document.getElementById("confirm-overlay"),
+  confirmBackdrop: document.getElementById("confirm-backdrop"),
+  confirmClose: document.getElementById("confirm-close"),
+  confirmTitle: document.getElementById("confirm-title"),
+  confirmMessage: document.getElementById("confirm-message"),
+  confirmCancel: document.getElementById("confirm-cancel"),
+  confirmAccept: document.getElementById("confirm-accept"),
 };
 
 const trackerCore = window.trackerCore;
+const trackerStorage = window.trackerStorage;
+const trackerTimer = window.trackerTimer;
 
 if (!trackerCore) {
   throw new Error("trackerCore helpers are not available.");
 }
 
-const loadedState = loadState();
-let logs = loadedState.logs;
-let settings = loadedState.settings;
-
-const timerState = {
-  isRunning: Boolean(loadedState.timerState?.isRunning),
-  lastTickMs: null,
-};
-
-if (timerState.isRunning) {
-  timerState.lastTickMs = Date.now();
+if (!trackerStorage) {
+  throw new Error("trackerStorage helpers are not available.");
 }
 
-const systemState = {
-  isSuspended: false,
-};
+if (!trackerTimer) {
+  throw new Error("trackerTimer helpers are not available.");
+}
+
+const initialPersistedState = loadState();
+const loadedState = trackerCore.createRuntimeState(initialPersistedState, {
+  autostart: initialPersistedState.settings?.autostart,
+  launchedAtLogin: false,
+});
+let days = loadedState.days;
+let settings = loadedState.settings;
+const timerState = trackerTimer.createTimerRuntime(loadedState.timerState);
 
 let calendarCursor = startOfMonth(new Date());
 let selectedDate = startOfDay(new Date());
@@ -341,57 +357,29 @@ let pendingAutoBackupPromise = null;
 let clearDataArmed = false;
 let clearDataArmTimeout = null;
 let toastTimeout = null;
+let isAutostartSyncPending = false;
+let confirmDialogState = null;
+let pendingConfirmResolve = null;
+let confirmDialogReturnFocus = null;
 const calendarCellRefs = new Map();
 
 function createDefaultPersistedState() {
-  return {
-    logs: {},
-    settings: {
-      dailyTargetHours: DEFAULT_DAILY_TARGET_HOURS,
-      weekendDays: DEFAULT_WEEKEND_DAYS.slice(),
-      dayOverrides: {},
-      language: DEFAULT_LANGUAGE,
-      dateFormat: DEFAULT_DATE_FORMAT,
-      weekStart: DEFAULT_WEEK_START,
-      autostart: false,
-      autoBackup: false,
-    },
-    timerState: {
-      isRunning: false,
-    },
-  };
+  return trackerStorage.createDefaultPersistedState();
 }
 
 function loadState() {
-  const fallback = createDefaultPersistedState();
-
-  for (const key of LEGACY_STORAGE_KEYS) {
-    try {
-      const raw = localStorage.getItem(key);
-      if (!raw) {
-        continue;
-      }
-
-      const parsed = JSON.parse(raw);
-      return trackerCore.normalizePersistedState(parsed, fallback);
-    } catch {
-      continue;
-    }
-  }
-
-  return trackerCore.createPersistedState(fallback);
+  return trackerStorage.loadPersistedState();
 }
 
 function persistState() {
   try {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify(trackerCore.createPersistedState({
-        logs,
-        settings,
-        timerState,
-      })),
-    );
+    trackerStorage.savePersistedState({
+      days,
+      settings,
+      timerState: {
+        isRunning: timerState.isRunning,
+      },
+    });
     maybeCreateAutoBackup();
     return true;
   } catch (error) {
@@ -442,13 +430,68 @@ function showAppToast(message, kind = "info", timeoutMs = 3500) {
 }
 
 function removePersistedStateKeys() {
-  for (const key of LEGACY_STORAGE_KEYS) {
-    try {
-      localStorage.removeItem(key);
-    } catch {
-      // Ignore storage cleanup failures; the fresh state will still be written.
-    }
+  trackerStorage.removePersistedStateKeys();
+}
+
+function renderConfirmDialog() {
+  if (!confirmDialogState) {
+    el.confirmTitle.textContent = "";
+    el.confirmMessage.textContent = "";
+    el.confirmCancel.textContent = "";
+    el.confirmAccept.textContent = "";
+    return;
   }
+
+  el.confirmTitle.textContent = confirmDialogState.title;
+  el.confirmMessage.textContent = confirmDialogState.message;
+  el.confirmCancel.textContent = confirmDialogState.cancelLabel;
+  el.confirmAccept.textContent = confirmDialogState.confirmLabel;
+  el.confirmClose.setAttribute("aria-label", confirmDialogState.cancelLabel);
+  el.confirmBackdrop.setAttribute("aria-label", confirmDialogState.cancelLabel);
+}
+
+function closeConfirmDialog(confirmed = false) {
+  if (el.confirmOverlay.hidden && !confirmDialogState && !pendingConfirmResolve) {
+    return;
+  }
+
+  const resolve = pendingConfirmResolve;
+  const returnFocusTarget = confirmDialogReturnFocus;
+
+  pendingConfirmResolve = null;
+  confirmDialogReturnFocus = null;
+  confirmDialogState = null;
+  el.confirmOverlay.hidden = true;
+  renderConfirmDialog();
+
+  if (resolve) {
+    resolve(confirmed);
+  }
+
+  if (returnFocusTarget && typeof returnFocusTarget.focus === "function" && !returnFocusTarget.disabled) {
+    returnFocusTarget.focus();
+  }
+}
+
+function requestConfirmDialog(options) {
+  if (pendingConfirmResolve) {
+    closeConfirmDialog(false);
+  }
+
+  confirmDialogState = {
+    title: String(options?.title ?? ""),
+    message: String(options?.message ?? ""),
+    cancelLabel: String(options?.cancelLabel ?? getUiText().cancelLabel),
+    confirmLabel: String(options?.confirmLabel ?? ""),
+  };
+  confirmDialogReturnFocus = options?.returnFocusTarget ?? null;
+  el.confirmOverlay.hidden = false;
+  renderConfirmDialog();
+
+  return new Promise((resolve) => {
+    pendingConfirmResolve = resolve;
+    el.confirmCancel.focus();
+  });
 }
 
 function maybeCreateAutoBackup() {
@@ -484,19 +527,57 @@ function maybeCreateAutoBackup() {
 
 
 function buildBackupPayload() {
-  return trackerCore.createBackupPayload({
-    logs,
+  return trackerStorage.createBackupSnapshot({
+    days,
     settings,
-    timerState,
+    timerState: {
+      isRunning: timerState.isRunning,
+    },
   });
 }
 
-function applyPersistedState(nextState) {
-  logs = nextState.logs;
-  settings = nextState.settings;
-  timerState.isRunning = Boolean(nextState.timerState?.isRunning);
-  timerState.lastTickMs = timerState.isRunning ? Date.now() : null;
-  systemState.isSuspended = false;
+function syncTrayState() {
+  window.desktopAPI?.sendTimerState?.({
+    isRunning: timerState.isRunning,
+  });
+}
+
+async function getBootstrapState() {
+  const fallbackBootstrapState = {
+    autostart: settings.autostart,
+    launchedAtLogin: false,
+  };
+  const desktopBootstrapState = window.desktopAPI?.getBootstrapState;
+
+  if (typeof desktopBootstrapState !== "function") {
+    return fallbackBootstrapState;
+  }
+
+  const bootstrapState = await desktopBootstrapState();
+  return trackerCore.sanitizeBootstrapState(bootstrapState, fallbackBootstrapState);
+}
+
+async function reconcileAutostartWithSystem(persist = false) {
+  const bootstrapState = await getBootstrapState();
+  settings.autostart = bootstrapState.autostart;
+
+  if (persist) {
+    scheduleSave();
+  }
+}
+
+function applyPersistedState(nextState, bootstrapState = null) {
+  const runtimeState = trackerCore.createRuntimeState(
+    nextState,
+    bootstrapState ?? {
+      autostart: nextState?.settings?.autostart,
+      launchedAtLogin: false,
+    },
+  );
+
+  days = runtimeState.days;
+  settings = runtimeState.settings;
+  trackerTimer.applyPersistedTimerState(timerState, runtimeState.timerState);
 
   flushSave();
   syncTrayState();
@@ -562,46 +643,31 @@ function getWeekdayOrder() {
   return Array.from({ length: 7 }, (_, index) => (start + index) % 7);
 }
 
-function addElapsedTime(startMs, endMs) {
-  if (trackerCore.addElapsedTimeToLogs(logs, startMs, endMs)) {
+function flushTick(options = {}) {
+  if (trackerTimer.flushTimer(timerState, days, {
+    allowWhileSuspended: options.allowWhileSuspended,
+    nowMs: options.nowMs,
+    source: "timer",
+  })) {
     scheduleSave();
   }
 }
 
-function flushTick(options = {}) {
-  if (!timerState.isRunning || timerState.lastTickMs === null) {
-    return;
-  }
-
-  if (systemState.isSuspended && options.allowWhileSuspended !== true) {
-    return;
-  }
-
-  const now = Date.now();
-  addElapsedTime(timerState.lastTickMs, now);
-  timerState.lastTickMs = now;
-}
-
 function handleSystemPause() {
-  if (systemState.isSuspended) {
+  if (timerState.isSuspended) {
     return;
   }
 
-  flushTick({ allowWhileSuspended: true });
+  trackerTimer.handleSystemPause(timerState, days, {
+    source: "timer",
+  });
   flushSave();
-  systemState.isSuspended = true;
   renderCore();
 }
 
 function handleSystemResume() {
-  if (!systemState.isSuspended) {
+  if (!trackerTimer.handleSystemResume(timerState)) {
     return;
-  }
-
-  systemState.isSuspended = false;
-
-  if (timerState.isRunning) {
-    timerState.lastTickMs = Date.now();
   }
 
   renderCore();
@@ -646,23 +712,15 @@ function getUiText() {
 }
 
 function getLiveWorkMs(date) {
-  if (!timerState.isRunning || timerState.lastTickMs === null || systemState.isSuspended) {
-    return 0;
-  }
+  return trackerTimer.getLiveWorkMs(timerState, date);
+}
 
-  const now = Date.now();
-  const dayStart = startOfDay(date).getTime();
-  const nextDayStart = dayStart + 24 * 60 * 60 * 1000;
-  const overlapStart = Math.max(timerState.lastTickMs, dayStart);
-  const overlapEnd = Math.min(now, nextDayStart);
-
-  return Math.max(0, overlapEnd - overlapStart);
+function getStoredWorkMsForDate(date) {
+  return trackerCore.getWorkMsForDate(days, date);
 }
 
 function getWorkMsForDate(date) {
-  const key = dateKey(date);
-  const stored = Number(logs[key]?.workMs) || 0;
-  return stored + getLiveWorkMs(date);
+  return getStoredWorkMsForDate(date) + getLiveWorkMs(date);
 }
 
 function isRecurringWeekend(date) {
@@ -702,6 +760,61 @@ function setDateOverride(date, mode) {
 function toggleSelectedDateOff() {
   setDateOverride(selectedDate, isDayOff(selectedDate) ? "work" : "off");
   renderCore();
+}
+
+function getClearDayState(date = selectedDate) {
+  return trackerCore.getClearDayState({
+    selectedDate: date,
+    todayDate: new Date(),
+    isTimerRunning: timerState.isRunning,
+    storedWorkMs: getWorkMsForDate(date),
+  });
+}
+
+async function clearSelectedDayWork() {
+  const ui = getUiText();
+  const targetDate = startOfDay(selectedDate);
+  const initialState = getClearDayState(targetDate);
+
+  if (!initialState.canClear) {
+    if (initialState.reason === "running-today") {
+      showAppToast(ui.clearDayBlockedRunning, "warning");
+    }
+    return;
+  }
+
+  const confirmed = await requestConfirmDialog({
+    title: ui.clearDayConfirmTitle,
+    message: ui.clearDayConfirmMessage,
+    confirmLabel: ui.clearDayConfirmAction,
+    returnFocusTarget: el.clearDay,
+  });
+
+  if (!confirmed) {
+    return;
+  }
+
+  const finalState = getClearDayState(targetDate);
+  if (!finalState.canClear) {
+    if (finalState.reason === "running-today") {
+      showAppToast(ui.clearDayBlockedRunning, "warning");
+    }
+    renderCore();
+    return;
+  }
+
+  if (timerState.isRunning && getLiveWorkMs(targetDate) > 0 && !isSameDay(targetDate, startOfDay(new Date()))) {
+    flushTick();
+  }
+
+  if (!trackerCore.clearDayEntries(days, dateKey(targetDate))) {
+    renderCore();
+    return;
+  }
+
+  flushSave();
+  renderCore();
+  showAppToast(ui.clearDaySuccess, "success");
 }
 
 function formatDayWord(value) {
@@ -899,6 +1012,8 @@ function renderSettingsPanel() {
   el.settingsAutostartOn.classList.toggle("active", autostart);
   el.settingsAutostartOff.setAttribute("aria-pressed", String(!autostart));
   el.settingsAutostartOn.setAttribute("aria-pressed", String(autostart));
+  el.settingsAutostartOff.disabled = isAutostartSyncPending;
+  el.settingsAutostartOn.disabled = isAutostartSyncPending;
 
   const autoBackup = settings.autoBackup === true;
   el.settingsAutoBackupOff.classList.toggle("active", !autoBackup);
@@ -1019,18 +1134,60 @@ function setWeekStart(weekStart) {
   syncSettingsState();
 }
 
-function setAutostart(enabled) {
+async function setAutostart(enabled) {
   const nextAutostart = enabled === true;
 
-  if (settings.autostart === nextAutostart) {
-    renderSettingsPanel();
+  if (isAutostartSyncPending) {
     return;
   }
 
-  settings.autostart = nextAutostart;
-  scheduleSave();
+  const desktopSetAutostart = window.desktopAPI?.setAutostart;
+  if (typeof desktopSetAutostart !== "function") {
+    showAppToast(getUiText().autostartFailed, "error");
+    return;
+  }
+
+  isAutostartSyncPending = true;
   renderSettingsPanel();
-  syncSettingsState();
+
+  try {
+    const currentBootstrapState = trackerCore.sanitizeBootstrapState(await getBootstrapState(), {
+      autostart: settings.autostart,
+      launchedAtLogin: false,
+    });
+    const autostartWasStale = settings.autostart !== currentBootstrapState.autostart;
+
+    settings.autostart = currentBootstrapState.autostart;
+    if (autostartWasStale) {
+      scheduleSave();
+    }
+
+    if (currentBootstrapState.autostart === nextAutostart) {
+      return;
+    }
+
+    const bootstrapState = await desktopSetAutostart(nextAutostart);
+    const normalizedBootstrapState = trackerCore.sanitizeBootstrapState(bootstrapState, {
+      autostart: settings.autostart,
+      launchedAtLogin: false,
+    });
+
+    settings.autostart = normalizedBootstrapState.autostart;
+    scheduleSave();
+  } catch (error) {
+    console.error("Unable to update autostart.", error);
+
+    try {
+      await reconcileAutostartWithSystem(true);
+    } catch (syncError) {
+      console.error("Unable to reconcile autostart state.", syncError);
+    }
+
+    showAppToast(getUiText().autostartFailed, "error");
+  } finally {
+    isAutostartSyncPending = false;
+    renderSettingsPanel();
+  }
 }
 
 function setAutoBackup(enabled) {
@@ -1064,28 +1221,41 @@ async function clearStoredData() {
         console.error("Pending auto backup failed before clearing data.", error);
       });
     }
-    await clearData();
+    const clearResult = await clearData();
+    if (!clearResult || clearResult.cleared !== true) {
+      throw new Error("Clear data did not complete successfully.");
+    }
     removePersistedStateKeys();
     calendarCursor = startOfMonth(new Date());
     selectedDate = startOfDay(new Date());
     lastAutoBackupDateKey = null;
     resetClearDataArming();
-    applyPersistedState(createDefaultPersistedState());
+    applyPersistedState(createDefaultPersistedState(), clearResult.bootstrap ?? {
+      autostart: false,
+      launchedAtLogin: false,
+    });
     closeSettingsPanel();
     showAppToast(ui.clearDataSuccess, "success");
   } catch (error) {
     console.error("Unable to clear tracker data.", error);
-    scheduleSave();
+
+    try {
+      await reconcileAutostartWithSystem(true);
+    } catch (syncError) {
+      console.error("Unable to reconcile autostart state.", syncError);
+      scheduleSave();
+    }
+
     showAppToast(ui.clearDataFailed, "error");
   } finally {
     el.settingsClearData.disabled = false;
+    renderSettingsPanel();
   }
 }
 
 function syncSettingsState() {
   window.desktopAPI?.sendSettingsState?.({
     language: settings.language,
-    autostart: settings.autostart,
     weekStart: settings.weekStart,
     autoBackup: settings.autoBackup,
   });
@@ -1194,6 +1364,7 @@ function refreshVisibleCalendar() {
 function renderSelectedDayPanel() {
   const ui = getUiText();
   const dayOff = isDayOff(selectedDate);
+  const clearState = getClearDayState(selectedDate);
   const actionLabel = dayOff ? ui.selectedDayWork : ui.selectedDayOff;
 
   el.selectedDayLabel.textContent = formatSelectedDate(selectedDate);
@@ -1202,6 +1373,10 @@ function renderSelectedDayPanel() {
   el.toggleDayOff.classList.toggle("active", dayOff);
   el.toggleDayOff.setAttribute("aria-pressed", String(dayOff));
   el.toggleDayOff.setAttribute("aria-label", actionLabel);
+  el.clearDay.textContent = ui.clearDayLabel;
+  el.clearDay.disabled = clearState.reason === "no-work";
+  el.clearDay.setAttribute("aria-label", ui.clearDayLabel);
+  el.clearDay.title = clearState.reason === "running-today" ? ui.clearDayBlockedRunning : "";
 }
 
 function renderCore() {
@@ -1224,12 +1399,20 @@ function renderAll() {
 
 function toggleRun() {
   if (timerState.isRunning) {
-    flushTick();
-    timerState.isRunning = false;
-    timerState.lastTickMs = null;
+    trackerTimer.stopTimer(timerState, days, {
+      source: "timer",
+    });
   } else {
-    timerState.isRunning = true;
-    timerState.lastTickMs = Date.now();
+    const today = startOfDay(new Date());
+
+    if (trackerCore.shouldForceWorkOverrideOnTimerStart({
+      isTimerRunning: timerState.isRunning,
+      isDayOffToday: isDayOff(today),
+    })) {
+      setDateOverride(today, "work");
+    }
+
+    trackerTimer.startTimer(timerState);
   }
 
   flushSave();
@@ -1248,6 +1431,9 @@ el.timerPanel.addEventListener("keydown", (event) => {
 });
 
 el.toggleDayOff.addEventListener("click", toggleSelectedDateOff);
+el.clearDay.addEventListener("click", () => {
+  void clearSelectedDayWork();
+});
 el.dailyTargetHours.addEventListener("change", () => {
   updateDailyTargetHours(el.dailyTargetHours.value);
 });
@@ -1262,8 +1448,12 @@ el.settingsDateFormatDmy.addEventListener("click", () => setDateFormat("dmy"));
 el.settingsDateFormatMdy.addEventListener("click", () => setDateFormat("mdy"));
 el.settingsWeekStartMonday.addEventListener("click", () => setWeekStart("monday"));
 el.settingsWeekStartSunday.addEventListener("click", () => setWeekStart("sunday"));
-el.settingsAutostartOff.addEventListener("click", () => setAutostart(false));
-el.settingsAutostartOn.addEventListener("click", () => setAutostart(true));
+el.settingsAutostartOff.addEventListener("click", () => {
+  void setAutostart(false);
+});
+el.settingsAutostartOn.addEventListener("click", () => {
+  void setAutostart(true);
+});
 el.settingsAutoBackupOff.addEventListener("click", () => setAutoBackup(false));
 el.settingsAutoBackupOn.addEventListener("click", () => setAutoBackup(true));
 el.settingsClearData.addEventListener("click", async () => {
@@ -1274,8 +1464,21 @@ el.settingsClearData.addEventListener("click", async () => {
 
   await clearStoredData();
 });
+el.confirmBackdrop.addEventListener("click", () => closeConfirmDialog(false));
+el.confirmClose.addEventListener("click", () => closeConfirmDialog(false));
+el.confirmCancel.addEventListener("click", () => closeConfirmDialog(false));
+el.confirmAccept.addEventListener("click", () => closeConfirmDialog(true));
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && !el.settingsOverlay.hidden) {
+  if (event.key !== "Escape") {
+    return;
+  }
+
+  if (!el.confirmOverlay.hidden) {
+    closeConfirmDialog(false);
+    return;
+  }
+
+  if (!el.settingsOverlay.hidden) {
     closeSettingsPanel();
   }
 });
@@ -1341,12 +1544,20 @@ el.importBackup.addEventListener("click", async () => {
       return;
     }
 
-    if (!window.confirm(getUiText().importConfirm)) {
+    const ui = getUiText();
+    const confirmed = await requestConfirmDialog({
+      title: ui.importBackup,
+      message: ui.importConfirm,
+      cancelLabel: ui.cancelLabel,
+      confirmLabel: ui.importBackup,
+      returnFocusTarget: el.importBackup,
+    });
+    if (!confirmed) {
       return;
     }
 
-    const nextState = trackerCore.normalizePersistedState(result.snapshot, createDefaultPersistedState());
-    applyPersistedState(nextState);
+    const bootstrapState = await getBootstrapState();
+    applyPersistedState(trackerStorage.normalizeImportedSnapshot(result.snapshot), bootstrapState);
     showAppToast(getUiText().importSuccess, "success");
   } catch (error) {
     console.error("Unable to import backup.", error);
@@ -1379,7 +1590,7 @@ window.addEventListener("beforeunload", () => {
 });
 
 setInterval(() => {
-  if (!timerState.isRunning || systemState.isSuspended) {
+  if (!timerState.isRunning || timerState.isSuspended) {
     return;
   }
 
@@ -1388,6 +1599,23 @@ setInterval(() => {
   syncTrayState();
 }, 1000);
 
-renderAll();
-syncTrayState();
-syncSettingsState();
+async function initializeApp() {
+  try {
+    const bootstrapState = await getBootstrapState();
+    const autostartChanged = settings.autostart !== bootstrapState.autostart;
+
+    settings.autostart = bootstrapState.autostart;
+
+    if (autostartChanged) {
+      scheduleSave();
+    }
+  } catch (error) {
+    console.error("Unable to load bootstrap state.", error);
+  }
+
+  renderAll();
+  syncTrayState();
+  syncSettingsState();
+}
+
+void initializeApp();

@@ -94,6 +94,7 @@
             </div>
             <div class="selection-actions">
               <button id="toggle-day-off" class="selection-btn" type="button">Выходной</button>
+              <button id="clear-day" class="selection-btn" type="button">Очистить день</button>
               <button id="import-backup" class="selection-btn" type="button">Импорт</button>
               <button id="export-backup" class="selection-btn" type="button">Экспорт</button>
             </div>
@@ -168,7 +169,32 @@
         </section>
       </div>
 
+      <div id="confirm-overlay" class="settings-overlay confirm-overlay" hidden>
+        <button id="confirm-backdrop" class="settings-backdrop" type="button" aria-label="Cancel confirmation"></button>
+        <section class="settings-panel confirm-panel" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+          <header class="settings-header">
+            <h2 id="confirm-title">Confirm action</h2>
+            <button id="confirm-close" class="window-btn settings-close" type="button" aria-label="Cancel confirmation">
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M4 4L12 12" />
+                <path d="M12 4L4 12" />
+              </svg>
+            </button>
+          </header>
+
+          <div class="settings-body confirm-body">
+            <p id="confirm-message" class="confirm-message"></p>
+            <div class="settings-toggle confirm-actions" role="group" aria-labelledby="confirm-title">
+              <button id="confirm-cancel" class="settings-option confirm-action" type="button">Cancel</button>
+              <button id="confirm-accept" class="settings-option confirm-action confirm-action--primary" type="button">Confirm</button>
+            </div>
+          </div>
+        </section>
+      </div>
+
     <script src="./tracker-core.js"></script>
+    <script src="./tracker-storage.js"></script>
+    <script src="./tracker-timer.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

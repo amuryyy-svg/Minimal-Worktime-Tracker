@@ -1,4 +1,4 @@
-const fs = require("fs");
+﻿const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { app, BrowserWindow, dialog, ipcMain, Menu, Tray, nativeImage, powerMonitor, screen } = require("electron");
@@ -8,6 +8,7 @@ const APP_ID = "com.workflow.minimalworktimetracker";
 app.setAppUserModelId(APP_ID);
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
+const loginItemState = require("./login-item-state.js");
 const trackerCore = require("./renderer/tracker-core.js");
 
 const TRAY_TEXT = {
@@ -80,7 +81,7 @@ if (appIcon.isEmpty()) {
 let mainWindow;
 let tray;
 let isQuitting = false;
-const shouldStartHidden = app.getLoginItemSettings().wasOpenedAtLogin === true;
+const shouldStartHidden = getBootstrapState().launchedAtLogin === true;
 
 const trayState = {
   isRunning: false,
@@ -88,6 +89,7 @@ const trayState = {
 };
 
 const WINDOW_SCREEN_MARGIN = 12;
+const STORAGE_CLEAR_TYPES = ["localstorage", "indexdb", "serviceworkers", "cachestorage", "filesystem", "websql"];
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(value, max));
@@ -102,6 +104,18 @@ function applyAutostartSetting(enabled) {
     openAtLogin: Boolean(enabled),
     openAsHidden: Boolean(enabled),
   });
+}
+function getBootstrapState() {
+  return loginItemState.createBootstrapState(app.getLoginItemSettings());
+}
+
+function getApplicationSession() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    return mainWindow.webContents.session;
+  }
+
+  const fallbackWindow = BrowserWindow.getAllWindows()[0];
+  return fallbackWindow ? fallbackWindow.webContents.session : null;
 }
 
 function createTrayIcon() {
@@ -272,14 +286,26 @@ ipcMain.on("timer-state", (_event, payload) => {
 
 ipcMain.on("settings-state", (_event, payload) => {
   trayState.language = payload?.language === "en" ? "en" : "ru";
-
-  if (typeof payload?.autostart === "boolean") {
-    applyAutostartSetting(payload.autostart);
-  }
-
   updateTrayMenu();
 });
 
+ipcMain.handle("bootstrap:state", () => {
+  return getBootstrapState();
+});
+
+ipcMain.handle("autostart:set", (_event, enabled) => {
+  if (typeof enabled !== "boolean") {
+    throw new TypeError("autostart:set expects a boolean.");
+  }
+
+  applyAutostartSetting(enabled);
+
+  return loginItemState.ensureBootstrapAutostart(
+    app.getLoginItemSettings(),
+    enabled,
+    "Unable to confirm autostart state.",
+  );
+});
 ipcMain.on("window:minimize", () => {
   hideWindow();
 });
@@ -356,19 +382,25 @@ ipcMain.handle("backup:import", async () => {
 });
 
 ipcMain.handle("data:clear", async () => {
-  try {
-    await fs.promises.rm(autoBackupPath, { recursive: true, force: true });
-  } catch (error) {
-    console.warn("Unable to remove auto backup directory.", error);
+  const applicationSession = getApplicationSession();
+  if (!applicationSession) {
+    throw new Error("Application session is not available.");
   }
 
-  try {
-    await fs.promises.mkdir(autoBackupPath, { recursive: true });
-  } catch (error) {
-    console.warn("Unable to recreate auto backup directory.", error);
-  }
+  await fs.promises.rm(autoBackupPath, { recursive: true, force: true });
+  await fs.promises.mkdir(autoBackupPath, { recursive: true });
+  await applicationSession.clearStorageData({
+    storages: STORAGE_CLEAR_TYPES,
+  });
 
-  return { cleared: true };
+  applyAutostartSetting(false);
+  const confirmedState = loginItemState.ensureBootstrapAutostart(
+    app.getLoginItemSettings(),
+    false,
+    "Unable to disable autostart during clear data.",
+  );
+
+  return { cleared: true, bootstrap: confirmedState };
 });
 
 powerMonitor.on("suspend", () => {

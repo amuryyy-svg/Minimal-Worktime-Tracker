@@ -5,7 +5,7 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "lint": "node --check src/main.js && node --check src/preload.js && node --check src/renderer/app.js && node --check src/renderer/tracker-core.js && node --check test/tracker-core.test.js",
+    "lint": "node --check src/main.js && node --check src/preload.js && node --check src/renderer/app.js && node --check src/renderer/tracker-core.js && node --check src/renderer/tracker-storage.js && node --check src/renderer/tracker-timer.js && node --check test/tracker-core.test.js",
     "test": "node test/tracker-core.test.js",
     "dist": "electron-builder --win"
   },

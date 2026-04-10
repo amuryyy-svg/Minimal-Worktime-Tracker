@@ -1,4 +1,4 @@
-(function (root, factory) {
+﻿(function (root, factory) {
   if (typeof module === "object" && module.exports) {
     module.exports = factory();
     return;
@@ -6,6 +6,23 @@
 
   root.trackerCore = factory();
 })(typeof globalThis !== "undefined" ? globalThis : window, function () {
+  const ENTRY_TYPE_INTERVAL = "interval";
+  const ENTRY_TYPE_LEGACY_TOTAL = "legacy-total";
+  const DEFAULT_INTERVAL_SOURCE = "timer";
+  const DEFAULT_LEGACY_SOURCE = "import";
+  const MIGRATED_V7_SOURCE = "migrated-v7";
+  const DAY_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+  const DEFAULT_DAILY_TARGET_HOURS = 6;
+  const DEFAULT_WEEKEND_DAYS = [0, 6];
+  const DEFAULT_LANGUAGE = "ru";
+  const DEFAULT_DATE_FORMAT = "localized";
+  const DEFAULT_WEEK_START = "monday";
+  const PERSISTED_STATE_VERSION = 8;
+
+  function isPlainObject(value) {
+    return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  }
+
   function pad(value) {
     return String(value).padStart(2, "0");
   }
@@ -117,13 +134,7 @@
     });
   }
 
-  const DEFAULT_WEEKEND_DAYS = [0, 6];
-  const DEFAULT_LANGUAGE = "ru";
-  const DEFAULT_DATE_FORMAT = "localized";
-  const DEFAULT_WEEK_START = "monday";
-  const PERSISTED_STATE_VERSION = 7;
-
-  function sanitizeDailyTargetHours(value, fallback = 6, min = 1, max = 24) {
+  function sanitizeDailyTargetHours(value, fallback = DEFAULT_DAILY_TARGET_HOURS, min = 1, max = 24) {
     const parsed = Number(value);
 
     if (!Number.isFinite(parsed)) {
@@ -156,14 +167,14 @@
   }
 
   function sanitizeDayOverrides(value) {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
+    if (!isPlainObject(value)) {
       return {};
     }
 
     const dayOverrides = {};
 
     for (const [key, mode] of Object.entries(value)) {
-      if (typeof key === "string" && (mode === "off" || mode === "work")) {
+      if (DAY_KEY_PATTERN.test(key) && (mode === "off" || mode === "work")) {
         dayOverrides[key] = mode;
       }
     }
@@ -218,7 +229,7 @@
   }
 
   function sanitizeLogs(value) {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
+    if (!isPlainObject(value)) {
       return {};
     }
 
@@ -238,13 +249,11 @@
   }
 
   function sanitizeSettings(settings, fallbackSettings = {}) {
-    const source = settings && typeof settings === "object" && !Array.isArray(settings) ? settings : {};
-    const normalizedFallback = fallbackSettings && typeof fallbackSettings === "object" && !Array.isArray(fallbackSettings)
-      ? fallbackSettings
-      : {};
+    const source = isPlainObject(settings) ? settings : {};
+    const normalizedFallback = isPlainObject(fallbackSettings) ? fallbackSettings : {};
     const fallbackDailyTargetHours = sanitizeDailyTargetHours(
       normalizedFallback.dailyTargetHours,
-      6,
+      DEFAULT_DAILY_TARGET_HOURS,
       1,
       24,
     );
@@ -293,41 +302,301 @@
     };
   }
 
+  function sanitizeBootstrapState(bootstrapState, fallbackState = {}) {
+    return {
+      autostart: sanitizeBoolean(bootstrapState?.autostart, sanitizeBoolean(fallbackState.autostart, false)),
+      launchedAtLogin: sanitizeBoolean(
+        bootstrapState?.launchedAtLogin,
+        sanitizeBoolean(fallbackState.launchedAtLogin, false),
+      ),
+    };
+  }
+
+  function sanitizeEntrySource(value, fallback) {
+    if (typeof value !== "string") {
+      return fallback;
+    }
+
+    const normalized = value.trim();
+    return normalized.length > 0 ? normalized : fallback;
+  }
+
+  function createDefaultSettings() {
+    return {
+      dailyTargetHours: DEFAULT_DAILY_TARGET_HOURS,
+      weekendDays: DEFAULT_WEEKEND_DAYS.slice(),
+      dayOverrides: {},
+      language: DEFAULT_LANGUAGE,
+      dateFormat: DEFAULT_DATE_FORMAT,
+      weekStart: DEFAULT_WEEK_START,
+      autostart: false,
+      autoBackup: false,
+    };
+  }
+
+  function createDefaultPersistedShape() {
+    return {
+      version: PERSISTED_STATE_VERSION,
+      days: {},
+      settings: createDefaultSettings(),
+      timerState: { isRunning: false },
+    };
+  }
+
+  function ensureDayRecord(days, key) {
+    if (!DAY_KEY_PATTERN.test(key)) {
+      return null;
+    }
+
+    if (!isPlainObject(days[key])) {
+      days[key] = { entries: [] };
+    }
+
+    if (!Array.isArray(days[key].entries)) {
+      days[key].entries = [];
+    }
+
+    return days[key];
+  }
+
+  function removeEmptyDayRecord(days, key) {
+    if (!Array.isArray(days[key]?.entries) || days[key].entries.length > 0) {
+      return;
+    }
+
+    delete days[key];
+  }
+
+  function addLegacyTotalToDays(days, key, durationMs, source = DEFAULT_LEGACY_SOURCE) {
+    if (!isPlainObject(days)) {
+      throw new TypeError("addLegacyTotalToDays expects a days object.");
+    }
+
+    if (!DAY_KEY_PATTERN.test(key)) {
+      return false;
+    }
+
+    const normalizedDurationMs = Math.trunc(Number(durationMs));
+    if (!Number.isFinite(normalizedDurationMs) || normalizedDurationMs <= 0) {
+      return false;
+    }
+
+    const dayRecord = ensureDayRecord(days, key);
+    if (!dayRecord) {
+      return false;
+    }
+
+    dayRecord.entries.push({
+      type: ENTRY_TYPE_LEGACY_TOTAL,
+      durationMs: normalizedDurationMs,
+      source: sanitizeEntrySource(source, DEFAULT_LEGACY_SOURCE),
+    });
+
+    return true;
+  }
+
+  function addIntervalToDays(days, startMs, endMs, source = DEFAULT_INTERVAL_SOURCE) {
+    if (!isPlainObject(days)) {
+      throw new TypeError("addIntervalToDays expects a days object.");
+    }
+
+    const normalizedStartMs = Math.trunc(Number(startMs));
+    const normalizedEndMs = Math.trunc(Number(endMs));
+    if (
+      !Number.isFinite(normalizedStartMs) ||
+      !Number.isFinite(normalizedEndMs) ||
+      normalizedEndMs <= normalizedStartMs
+    ) {
+      return false;
+    }
+
+    const normalizedSource = sanitizeEntrySource(source, DEFAULT_INTERVAL_SOURCE);
+    let cursorMs = normalizedStartMs;
+
+    while (cursorMs < normalizedEndMs) {
+      const current = new Date(cursorMs);
+      const nextMidnightMs = new Date(
+        current.getFullYear(),
+        current.getMonth(),
+        current.getDate() + 1,
+      ).getTime();
+      const segmentEndMs = Math.min(normalizedEndMs, nextMidnightMs);
+      const dayRecord = ensureDayRecord(days, dateKey(current));
+
+      if (dayRecord && segmentEndMs > cursorMs) {
+        dayRecord.entries.push({
+          type: ENTRY_TYPE_INTERVAL,
+          startMs: cursorMs,
+          endMs: segmentEndMs,
+          source: normalizedSource,
+        });
+      }
+
+      cursorMs = segmentEndMs;
+    }
+
+    return true;
+  }
+
+  function sumDayEntries(entries) {
+    if (!Array.isArray(entries)) {
+      return 0;
+    }
+
+    let totalMs = 0;
+
+    for (const entry of entries) {
+      if (!isPlainObject(entry)) {
+        continue;
+      }
+
+      if (entry.type === ENTRY_TYPE_INTERVAL) {
+        const startMs = Math.trunc(Number(entry.startMs));
+        const endMs = Math.trunc(Number(entry.endMs));
+        if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs) {
+          totalMs += endMs - startMs;
+        }
+        continue;
+      }
+
+      if (entry.type === ENTRY_TYPE_LEGACY_TOTAL) {
+        const durationMs = Math.trunc(Number(entry.durationMs));
+        if (Number.isFinite(durationMs) && durationMs > 0) {
+          totalMs += durationMs;
+        }
+      }
+    }
+
+    return totalMs;
+  }
+
+  function getDayEntries(days, dayOrKey) {
+    if (!isPlainObject(days)) {
+      return [];
+    }
+
+    const key = typeof dayOrKey === "string" ? dayOrKey : dateKey(dayOrKey);
+    return Array.isArray(days[key]?.entries) ? days[key].entries : [];
+  }
+
+  function getDayWorkMs(days, dayOrKey) {
+    return sumDayEntries(getDayEntries(days, dayOrKey));
+  }
+
+  function getWorkMsForDate(days, date) {
+    return getDayWorkMs(days, date);
+  }
+
+  function clearDayEntries(days, key) {
+    if (!isPlainObject(days)) {
+      throw new TypeError("clearDayEntries expects a days object.");
+    }
+
+    if (!DAY_KEY_PATTERN.test(key)) {
+      return false;
+    }
+
+    if (!Array.isArray(days[key]?.entries) || days[key].entries.length === 0) {
+      return false;
+    }
+
+    delete days[key];
+    return true;
+  }
+
+  function normalizeDays(value) {
+    if (!isPlainObject(value)) {
+      return {};
+    }
+
+    const days = {};
+
+    for (const [key, dayRecord] of Object.entries(value)) {
+      const entries = Array.isArray(dayRecord?.entries) ? dayRecord.entries : [];
+
+      for (const entry of entries) {
+        if (!isPlainObject(entry)) {
+          continue;
+        }
+
+        if (entry.type === ENTRY_TYPE_INTERVAL) {
+          addIntervalToDays(days, entry.startMs, entry.endMs, entry.source);
+          continue;
+        }
+
+        if (entry.type === ENTRY_TYPE_LEGACY_TOTAL) {
+          addLegacyTotalToDays(days, key, entry.durationMs, entry.source);
+        }
+      }
+    }
+
+    for (const key of Object.keys(days)) {
+      removeEmptyDayRecord(days, key);
+    }
+
+    return days;
+  }
+
+  function migrateLogsToDays(logs) {
+    const days = {};
+
+    for (const [key, record] of Object.entries(sanitizeLogs(logs))) {
+      if (!DAY_KEY_PATTERN.test(key)) {
+        continue;
+      }
+
+      addLegacyTotalToDays(days, key, record.workMs, MIGRATED_V7_SOURCE);
+    }
+
+    return days;
+  }
+
   function normalizePersistedState(raw, fallbackState = {}) {
-    const source = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
-    const fallbackLogs = sanitizeLogs(fallbackState.logs);
-    const fallbackSettings = sanitizeSettings(fallbackState.settings);
-    const fallbackTimerState = sanitizeTimerState(fallbackState.timerState);
+    const source = isPlainObject(raw) ? raw : {};
+    const fallback = isPlainObject(fallbackState) ? fallbackState : {};
+    const fallbackShape = createDefaultPersistedShape();
+    const fallbackSettings = sanitizeSettings(fallback.settings, fallbackShape.settings);
+    const fallbackTimerState = sanitizeTimerState(fallback.timerState ?? fallbackShape.timerState);
+    const days = source.days != null
+      ? normalizeDays(source.days)
+      : migrateLogsToDays(source.logs);
 
     return {
       version: PERSISTED_STATE_VERSION,
-      logs: source.logs == null ? fallbackLogs : sanitizeLogs(source.logs),
+      days,
       settings: source.settings == null ? fallbackSettings : sanitizeSettings(source.settings, fallbackSettings),
       timerState: source.timerState == null ? fallbackTimerState : sanitizeTimerState(source.timerState),
     };
   }
 
   function createPersistedState(state = {}) {
-    return normalizePersistedState(state, {
-      logs: {},
-      settings: {
-        dailyTargetHours: 6,
-        weekendDays: DEFAULT_WEEKEND_DAYS,
-        dayOverrides: {},
-        language: DEFAULT_LANGUAGE,
-        dateFormat: DEFAULT_DATE_FORMAT,
-        weekStart: DEFAULT_WEEK_START,
-        autostart: false,
-        autoBackup: false,
-      },
-      timerState: { isRunning: false },
-    });
+    return normalizePersistedState(state, createDefaultPersistedShape());
   }
 
   function createBackupPayload(state = {}) {
     return {
       ...createPersistedState(state),
       exportedAt: new Date().toISOString(),
+    };
+  }
+
+  function createRuntimeState(state = {}, bootstrapState = {}) {
+    const persistedState = createPersistedState(state);
+    const normalizedBootstrapState = sanitizeBootstrapState(bootstrapState, {
+      autostart: persistedState.settings.autostart,
+      launchedAtLogin: false,
+    });
+
+    return {
+      version: persistedState.version,
+      days: persistedState.days,
+      settings: {
+        ...persistedState.settings,
+        autostart: normalizedBootstrapState.autostart,
+      },
+      timerState: {
+        isRunning: false,
+      },
     };
   }
 
@@ -341,33 +610,94 @@
   }
 
   function addElapsedTimeToLogs(logs, startMs, endMs) {
-    if (!logs || typeof logs !== "object") {
+    if (!isPlainObject(logs)) {
       throw new TypeError("addElapsedTimeToLogs expects a logs object.");
     }
 
-    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
+    const normalizedStartMs = Math.trunc(Number(startMs));
+    const normalizedEndMs = Math.trunc(Number(endMs));
+    if (
+      !Number.isFinite(normalizedStartMs) ||
+      !Number.isFinite(normalizedEndMs) ||
+      normalizedEndMs <= normalizedStartMs
+    ) {
       return false;
     }
 
-    let cursor = startMs;
+    let cursorMs = normalizedStartMs;
 
-    while (cursor < endMs) {
-      const current = new Date(cursor);
-      const nextMidnight = new Date(
+    while (cursorMs < normalizedEndMs) {
+      const current = new Date(cursorMs);
+      const nextMidnightMs = new Date(
         current.getFullYear(),
         current.getMonth(),
         current.getDate() + 1,
       ).getTime();
-      const segmentEnd = Math.min(endMs, nextMidnight);
-      const deltaMs = segmentEnd - cursor;
-      const key = dateKey(current);
-      const record = ensureLogRecord(logs, key);
+      const segmentEndMs = Math.min(normalizedEndMs, nextMidnightMs);
+      const record = ensureLogRecord(logs, dateKey(current));
 
-      record.workMs += deltaMs;
-      cursor = segmentEnd;
+      record.workMs += segmentEndMs - cursorMs;
+      cursorMs = segmentEndMs;
     }
 
     return true;
+  }
+
+  function clearWorkLogForDate(logs, key) {
+    if (!isPlainObject(logs)) {
+      throw new TypeError("clearWorkLogForDate expects a logs object.");
+    }
+
+    if (typeof key !== "string" || key.length === 0) {
+      return false;
+    }
+
+    if (Math.max(0, Number(logs[key]?.workMs) || 0) === 0) {
+      return false;
+    }
+
+    delete logs[key];
+    return true;
+  }
+
+  function getClearDayState({
+    selectedDate,
+    todayDate = new Date(),
+    isTimerRunning = false,
+    storedWorkMs = 0,
+  }) {
+    const selectedTime = selectedDate?.getTime?.();
+    const todayTime = todayDate?.getTime?.();
+
+    if (!Number.isFinite(selectedTime) || !Number.isFinite(todayTime)) {
+      throw new TypeError("getClearDayState expects valid selectedDate and todayDate values.");
+    }
+
+    if (Boolean(isTimerRunning) && isSameDay(startOfDay(selectedDate), startOfDay(todayDate))) {
+      return {
+        canClear: false,
+        reason: "running-today",
+      };
+    }
+
+    if (Math.max(0, Number(storedWorkMs) || 0) === 0) {
+      return {
+        canClear: false,
+        reason: "no-work",
+      };
+    }
+
+    return {
+      canClear: true,
+      reason: null,
+    };
+  }
+
+  function shouldForceWorkOverrideOnTimerStart({
+    isTimerRunning = false,
+    isDayOffToday = false,
+  }) {
+    return Boolean(isTimerRunning) !== true && Boolean(isDayOffToday) === true;
   }
 
   function calculateCurrentStreak({
@@ -426,7 +756,14 @@
 
   return {
     addElapsedTimeToLogs,
+    addIntervalToDays,
+    addLegacyTotalToDays,
     calculateCurrentStreak,
+    clearDayEntries,
+    clearWorkLogForDate,
+    createBackupPayload,
+    createPersistedState,
+    createRuntimeState,
     dateKey,
     formatCompactWork,
     formatDayWord,
@@ -434,22 +771,27 @@
     formatDuration,
     formatMonthTitle,
     formatSelectedDate,
+    getClearDayState,
+    getDayEntries,
+    getDayWorkMs,
+    getWorkMsForDate,
     isSameDay,
     isSameMonth,
-    sanitizeDailyTargetHours,
-    sanitizeBoolean,
-    createBackupPayload,
-    createPersistedState,
     normalizePersistedState,
-    sanitizeDayOverrides,
+    sanitizeBoolean,
+    sanitizeBootstrapState,
+    sanitizeDailyTargetHours,
     sanitizeDateFormat,
+    sanitizeDayOverrides,
     sanitizeLogs,
     sanitizeSettings,
-    sanitizeWeekStart,
     sanitizeTimerState,
+    sanitizeWeekStart,
     sanitizeWeekendDays,
-    PERSISTED_STATE_VERSION,
+    shouldForceWorkOverrideOnTimerStart,
     startOfDay,
     startOfMonth,
+    sumDayEntries,
+    PERSISTED_STATE_VERSION,
   };
 });
