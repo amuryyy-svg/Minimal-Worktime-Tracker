@@ -565,7 +565,7 @@ button,
 .selection-actions {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(88px, auto);
+  grid-auto-columns: minmax(76px, auto);
 }
 
 .selection-actions > * + * {
@@ -577,13 +577,23 @@ button,
   border: 0;
   background: transparent;
   color: var(--text-soft);
-  padding: 0 16px;
+  padding: 0 12px;
   cursor: pointer;
   font-family: var(--font-mono);
   font-size: 0.72rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   transition: color 140ms ease, background-color 140ms ease;
+}
+
+.selection-btn:disabled {
+  cursor: default;
+  color: var(--text-faint);
+}
+
+.selection-btn:disabled:hover {
+  background: transparent;
+  color: var(--text-faint);
 }
 
 .selection-btn.active {
@@ -649,7 +659,7 @@ button,
   margin: 0;
   display: flex;
   align-items: center;
-  padding: 0 16px;
+  padding: 0 12px;
   font-size: 1rem;
   font-weight: 700;
   letter-spacing: -0.04em;
@@ -728,6 +738,37 @@ button,
   background: var(--accent-soft);
 }
 
+.confirm-panel {
+  width: min(100%, 360px);
+  max-width: 360px;
+}
+
+.confirm-body {
+  gap: 16px;
+}
+
+.confirm-message {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.confirm-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.confirm-action--primary {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.confirm-action--primary:hover {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent-soft) 78%, white 22%);
+}
+
 .app-toast {
   position: absolute;
   left: 50%;
@@ -802,7 +843,7 @@ button,
   }
 
   .selection-actions {
-    grid-auto-columns: minmax(78px, auto);
+    grid-auto-columns: minmax(68px, auto);
   }
 }
 

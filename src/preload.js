@@ -1,6 +1,8 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("desktopAPI", {
+  getBootstrapState: () => ipcRenderer.invoke("bootstrap:state"),
+  setAutostart: (enabled) => ipcRenderer.invoke("autostart:set", enabled),
   sendTimerState: (payload) => ipcRenderer.send("timer-state", payload),
   sendSettingsState: (payload) => ipcRenderer.send("settings-state", payload),
   onTrayCommand: (callback) => {
