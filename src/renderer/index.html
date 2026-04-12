@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="ru">
+<html lang="ru" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Work Tracker</title>
-    <link rel="icon" type="image/png" sizes="any" href="../../Logo.png" />
+    <link rel="icon" type="image/x-icon" href="../../Logo.ico" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -95,8 +95,21 @@
             <div class="selection-actions">
               <button id="toggle-day-off" class="selection-btn" type="button">Выходной</button>
               <button id="clear-day" class="selection-btn" type="button">Очистить день</button>
-              <button id="import-backup" class="selection-btn" type="button">Импорт</button>
-              <button id="export-backup" class="selection-btn" type="button">Экспорт</button>
+              <button
+                id="day-menu-button"
+                class="selection-btn selection-icon-btn"
+                type="button"
+                aria-label="Меню дня"
+                aria-haspopup="dialog"
+                aria-controls="day-menu-overlay"
+                aria-expanded="false"
+              >
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="M3.5 4.5H12.5" />
+                  <path d="M3.5 8H12.5" />
+                  <path d="M3.5 11.5H12.5" />
+                </svg>
+              </button>
             </div>
           </section>
         </section>
@@ -106,7 +119,7 @@
 
       <div id="settings-overlay" class="settings-overlay" hidden>
         <button id="settings-backdrop" class="settings-backdrop" type="button" aria-label="&#1047;&#1072;&#1082;&#1088;&#1099;&#1090;&#1100; &#1085;&#1072;&#1089;&#1090;&#1088;&#1086;&#1081;&#1082;&#1080;"></button>
-        <section class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <section class="settings-panel tile-dialog" role="dialog" aria-modal="true" aria-labelledby="settings-title">
           <header class="settings-header">
             <h2 id="settings-title">&#1053;&#1072;&#1089;&#1090;&#1088;&#1086;&#1081;&#1082;&#1080;</h2>
             <button id="settings-close" class="window-btn settings-close" type="button" aria-label="&#1047;&#1072;&#1082;&#1088;&#1099;&#1090;&#1100; &#1085;&#1072;&#1089;&#1090;&#1088;&#1086;&#1081;&#1082;&#1080;">
@@ -117,12 +130,20 @@
             </button>
           </header>
 
-          <div class="settings-body">
+          <div class="settings-body settings-body--stacked">
             <section class="settings-section">
               <p id="settings-language-label" class="settings-label">Language</p>
               <div class="settings-toggle" role="radiogroup" aria-labelledby="settings-language-label">
                 <button id="settings-language-ru" class="settings-option" type="button" aria-pressed="true">Russian</button>
                 <button id="settings-language-en" class="settings-option" type="button" aria-pressed="false">English</button>
+              </div>
+            </section>
+            <section class="settings-section">
+              <p id="settings-theme-label" class="settings-label">Theme</p>
+              <div class="settings-toggle settings-toggle--triple" role="radiogroup" aria-labelledby="settings-theme-label">
+                <button id="settings-theme-light" class="settings-option" type="button" aria-pressed="true">Light</button>
+                <button id="settings-theme-auto" class="settings-option" type="button" aria-pressed="false">Auto</button>
+                <button id="settings-theme-dark" class="settings-option" type="button" aria-pressed="false">Dark</button>
               </div>
             </section>
 
@@ -140,6 +161,25 @@
               <div class="settings-toggle" role="radiogroup" aria-labelledby="settings-week-start-label">
                 <button id="settings-week-start-monday" class="settings-option" type="button" aria-pressed="true">Monday</button>
                 <button id="settings-week-start-sunday" class="settings-option" type="button" aria-pressed="false">Sunday</button>
+              </div>
+            </section>
+
+            <section class="settings-section settings-section--rollover">
+              <p id="settings-day-rollover-label" class="settings-label">Day rollover time</p>
+              <div class="settings-field">
+                <div id="settings-day-rollover-control" class="settings-rollover-control" role="group" aria-labelledby="settings-day-rollover-label">
+                  <button id="settings-day-rollover-prev" class="settings-rollover-arrow" type="button" aria-label="Earlier time">
+                    <svg viewBox="0 0 16 16" aria-hidden="true">
+                      <path d="M10 3L5 8L10 13" />
+                    </svg>
+                  </button>
+                  <div id="settings-day-rollover-value" class="settings-rollover-value" aria-live="polite" aria-atomic="true">06:00</div>
+                  <button id="settings-day-rollover-next" class="settings-rollover-arrow" type="button" aria-label="Later time">
+                    <svg viewBox="0 0 16 16" aria-hidden="true">
+                      <path d="M6 3L11 8L6 13" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </section>
 
@@ -161,10 +201,49 @@
 
             <section class="settings-section">
               <p id="settings-data-label" class="settings-label">Data</p>
-              <div class="settings-toggle settings-toggle--single" role="group" aria-labelledby="settings-data-label">
-                <button id="settings-clear-data" class="settings-option" type="button">Clear data</button>
+              <div class="settings-actions-grid" role="group" aria-labelledby="settings-data-label">
+                <button id="import-backup" class="settings-option" type="button">Import</button>
+                <button id="export-backup" class="settings-option" type="button">Export</button>
+                <button id="settings-clear-data" class="settings-option settings-option--wide" type="button">Clear data</button>
               </div>
             </section>
+          </div>
+        </section>
+      </div>
+
+      <div id="day-menu-overlay" class="day-menu-overlay" hidden>
+        <button id="day-menu-backdrop" class="settings-backdrop" type="button" aria-label="Закрыть меню дня"></button>
+        <section class="day-menu-panel tile-dialog" role="dialog" aria-modal="true" aria-labelledby="day-details-title">
+          <header class="settings-header">
+            <div class="day-menu-heading">
+              <p id="day-menu-caption" class="day-menu-caption">23 марта</p>
+              <h2 id="day-details-title" class="day-menu-title">Детали дня</h2>
+            </div>
+            <button id="day-menu-close" class="window-btn settings-close" type="button" aria-label="Закрыть меню дня">
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M4 4L12 12" />
+                <path d="M12 4L4 12" />
+              </svg>
+            </button>
+          </header>
+
+          <div class="settings-body day-menu-body">
+            <div class="day-menu-stat" aria-label="Сохранённый итог дня">
+              <span id="day-details-stored-label" class="day-menu-stat-label">Сохранённый итог</span>
+              <strong id="day-details-stored-value" class="day-menu-stat-value">0 мин</strong>
+            </div>
+            <div class="day-menu-stat" aria-label="Базовое время дня">
+              <span id="day-details-base-label" class="day-menu-stat-label">База</span>
+              <strong id="day-details-base-value" class="day-menu-stat-value">0 мин</strong>
+            </div>
+            <div class="day-menu-stat" aria-label="Корректировка дня">
+              <span id="day-details-adjustment-label" class="day-menu-stat-label">Корректировка</span>
+              <strong id="day-details-adjustment-value" class="day-menu-stat-value">0 мин</strong>
+            </div>
+            <button id="edit-day-time" class="day-menu-edit" type="button">Исправить время</button>
+            <p id="day-details-live" class="day-menu-live" hidden>Текущая сессия: 0 мин</p>
+            <p id="day-details-empty" class="day-menu-empty" hidden>Сохранённых записей за этот день пока нет.</p>
+            <div id="day-details-list" class="day-menu-list"></div>
           </div>
         </section>
       </div>
@@ -192,9 +271,55 @@
         </section>
       </div>
 
-    <script src="./tracker-core.js"></script>
-    <script src="./tracker-storage.js"></script>
-    <script src="./tracker-timer.js"></script>
-    <script src="./app.js"></script>
+      <div id="manual-edit-overlay" class="settings-overlay manual-edit-overlay" hidden>
+        <button id="manual-edit-backdrop" class="settings-backdrop" type="button" aria-label="Закрыть редактор дня"></button>
+        <section class="settings-panel manual-edit-panel" role="dialog" aria-modal="true" aria-labelledby="manual-edit-title" aria-describedby="manual-edit-current-value">
+          <header class="settings-header">
+            <h2 id="manual-edit-title">Исправить время дня</h2>
+            <button id="manual-edit-close" class="window-btn settings-close" type="button" aria-label="Закрыть редактор дня">
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M4 4L12 12" />
+                <path d="M12 4L4 12" />
+              </svg>
+            </button>
+          </header>
+
+          <form id="manual-edit-form" class="settings-body manual-edit-body">
+            <div class="manual-edit-summary">
+              <div class="manual-edit-summary-item">
+                <span id="manual-edit-current-label" class="settings-label">Текущий итог</span>
+                <strong id="manual-edit-current-value" class="manual-edit-summary-value">0 мин</strong>
+              </div>
+              <div class="manual-edit-summary-item">
+                <span id="manual-edit-base-label" class="settings-label">База без правки</span>
+                <strong id="manual-edit-base-value" class="manual-edit-summary-value">0 мин</strong>
+              </div>
+              <div class="manual-edit-summary-item">
+                <span id="manual-edit-adjustment-label" class="settings-label">Будущая корректировка</span>
+                <strong id="manual-edit-adjustment-value" class="manual-edit-summary-value">0 мин</strong>
+              </div>
+            </div>
+            <div class="manual-edit-fields">
+              <label class="manual-edit-field">
+                <span id="manual-edit-hours-label" class="settings-label">Часы</span>
+                <input id="manual-edit-hours" class="manual-edit-input" type="number" min="0" step="1" inputmode="numeric" value="0" />
+              </label>
+              <label class="manual-edit-field">
+                <span id="manual-edit-minutes-label" class="settings-label">Минуты</span>
+                <input id="manual-edit-minutes" class="manual-edit-input" type="number" min="0" max="59" step="1" inputmode="numeric" value="0" />
+              </label>
+            </div>
+            <p id="manual-edit-error" class="manual-edit-error" hidden></p>
+            <div class="settings-toggle confirm-actions" role="group" aria-labelledby="manual-edit-title">
+              <button id="manual-edit-cancel" class="settings-option confirm-action" type="button">Отмена</button>
+              <button id="manual-edit-save" class="settings-option confirm-action confirm-action--primary" type="submit">Сохранить</button>
+            </div>
+          </form>
+        </section>
+      </div>
+      <script src="./tracker-core.js"></script>
+      <script src="./tracker-storage.js"></script>
+      <script src="./tracker-timer.js"></script>
+      <script src="./app.js"></script>
   </body>
 </html>

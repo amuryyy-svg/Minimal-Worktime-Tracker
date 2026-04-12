@@ -1,4 +1,4 @@
-﻿(function (root, factory) {
+(function (root, factory) {
   if (typeof module === "object" && module.exports) {
     module.exports = factory();
     return;
@@ -8,8 +8,10 @@
 })(typeof globalThis !== "undefined" ? globalThis : window, function () {
   const ENTRY_TYPE_INTERVAL = "interval";
   const ENTRY_TYPE_LEGACY_TOTAL = "legacy-total";
+  const ENTRY_TYPE_MANUAL_ADJUSTMENT = "manual-adjustment";
   const DEFAULT_INTERVAL_SOURCE = "timer";
   const DEFAULT_LEGACY_SOURCE = "import";
+  const DEFAULT_MANUAL_ADJUSTMENT_SOURCE = "manual-edit";
   const MIGRATED_V7_SOURCE = "migrated-v7";
   const DAY_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
   const DEFAULT_DAILY_TARGET_HOURS = 6;
@@ -17,6 +19,9 @@
   const DEFAULT_LANGUAGE = "ru";
   const DEFAULT_DATE_FORMAT = "localized";
   const DEFAULT_WEEK_START = "monday";
+  const DEFAULT_THEME = "light";
+  const DEFAULT_DAY_ROLLOVER_TIME = "06:00";
+  const DAY_ROLLOVER_TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
   const PERSISTED_STATE_VERSION = 8;
 
   function isPlainObject(value) {
@@ -198,8 +203,87 @@
     return fallback;
   }
 
+
+  function sanitizeDayRolloverTime(value, fallback = DEFAULT_DAY_ROLLOVER_TIME) {
+    const normalizedFallback = DAY_ROLLOVER_TIME_PATTERN.test(fallback)
+      ? fallback
+      : DEFAULT_DAY_ROLLOVER_TIME;
+
+    if (typeof value !== "string") {
+      return normalizedFallback;
+    }
+
+    const normalizedValue = value.trim();
+    if (!DAY_ROLLOVER_TIME_PATTERN.test(normalizedValue)) {
+      return normalizedFallback;
+    }
+
+    return normalizedValue;
+  }
+
+  function getDayRolloverTimeParts(dayRolloverTime = DEFAULT_DAY_ROLLOVER_TIME) {
+    const normalized = sanitizeDayRolloverTime(dayRolloverTime, DEFAULT_DAY_ROLLOVER_TIME);
+    const [hoursText, minutesText] = normalized.split(":");
+
+    return {
+      hours: Number(hoursText),
+      minutes: Number(minutesText),
+    };
+  }
+
+  function getBusinessDayBoundsForLabelDate(dayDate, dayRolloverTime = DEFAULT_DAY_ROLLOVER_TIME) {
+    const { hours, minutes } = getDayRolloverTimeParts(dayRolloverTime);
+    const startMs = new Date(
+      dayDate.getFullYear(),
+      dayDate.getMonth(),
+      dayDate.getDate(),
+      hours,
+      minutes,
+      0,
+      0,
+    ).getTime();
+    const endDate = new Date(startMs);
+    endDate.setDate(endDate.getDate() + 1);
+
+    return {
+      startMs,
+      endMs: endDate.getTime(),
+    };
+  }
+
+  function getBusinessDayDateFromInstant(date, dayRolloverTime = DEFAULT_DAY_ROLLOVER_TIME) {
+    const { hours, minutes } = getDayRolloverTimeParts(dayRolloverTime);
+    const boundaryStartDate = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      hours,
+      minutes,
+      0,
+      0,
+    );
+
+    if (date.getTime() < boundaryStartDate.getTime()) {
+      boundaryStartDate.setDate(boundaryStartDate.getDate() - 1);
+    }
+
+    return startOfDay(boundaryStartDate);
+  }
+
+  function getBusinessDayKeyFromInstant(date, dayRolloverTime = DEFAULT_DAY_ROLLOVER_TIME) {
+    return dateKey(getBusinessDayDateFromInstant(date, dayRolloverTime));
+  }
+
   function sanitizeDateFormat(value, fallback = DEFAULT_DATE_FORMAT) {
     if (value === "localized" || value === "dmy" || value === "mdy") {
+      return value;
+    }
+
+    return fallback;
+  }
+
+  function sanitizeTheme(value, fallback = DEFAULT_THEME) {
+    if (value === "light" || value === "dark" || value === "auto") {
       return value;
     }
 
@@ -248,6 +332,7 @@
     return logs;
   }
 
+
   function sanitizeSettings(settings, fallbackSettings = {}) {
     const source = isPlainObject(settings) ? settings : {};
     const normalizedFallback = isPlainObject(fallbackSettings) ? fallbackSettings : {};
@@ -262,6 +347,11 @@
     const fallbackLanguage = sanitizeLanguage(normalizedFallback.language, DEFAULT_LANGUAGE);
     const fallbackDateFormat = sanitizeDateFormat(normalizedFallback.dateFormat, DEFAULT_DATE_FORMAT);
     const fallbackWeekStart = sanitizeWeekStart(normalizedFallback.weekStart, DEFAULT_WEEK_START);
+    const fallbackDayRolloverTime = sanitizeDayRolloverTime(
+      normalizedFallback.dayRolloverTime,
+      DEFAULT_DAY_ROLLOVER_TIME,
+    );
+    const fallbackTheme = sanitizeTheme(normalizedFallback.theme, DEFAULT_THEME);
     const fallbackAutostart = sanitizeBoolean(normalizedFallback.autostart, false);
     const fallbackAutoBackup = sanitizeBoolean(normalizedFallback.autoBackup, false);
 
@@ -287,6 +377,12 @@
       weekStart: source.weekStart === undefined
         ? fallbackWeekStart
         : sanitizeWeekStart(source.weekStart, fallbackWeekStart),
+      dayRolloverTime: source.dayRolloverTime === undefined
+        ? fallbackDayRolloverTime
+        : sanitizeDayRolloverTime(source.dayRolloverTime, fallbackDayRolloverTime),
+      theme: source.theme === undefined
+        ? fallbackTheme
+        : sanitizeTheme(source.theme, fallbackTheme),
       autostart: source.autostart === undefined
         ? fallbackAutostart
         : sanitizeBoolean(source.autostart, fallbackAutostart),
@@ -321,6 +417,47 @@
     return normalized.length > 0 ? normalized : fallback;
   }
 
+
+  function getIntervalDurationMs(entry) {
+    const startMs = Math.trunc(Number(entry?.startMs));
+    const endMs = Math.trunc(Number(entry?.endMs));
+
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
+      return 0;
+    }
+
+    return endMs - startMs;
+  }
+
+  function getLegacyTotalDurationMs(entry) {
+    const durationMs = Math.trunc(Number(entry?.durationMs));
+    if (!Number.isFinite(durationMs) || durationMs <= 0) {
+      return 0;
+    }
+
+    return durationMs;
+  }
+
+  function getManualAdjustmentDeltaMs(entry) {
+    const deltaMs = Math.trunc(Number(entry?.deltaMs));
+    if (!Number.isFinite(deltaMs) || deltaMs === 0) {
+      return 0;
+    }
+
+    return deltaMs;
+  }
+
+  function clampManualAdjustmentDelta(baseTotalMs, deltaMs) {
+    const normalizedBaseTotalMs = Math.max(0, Math.trunc(Number(baseTotalMs)) || 0);
+    const normalizedDeltaMs = Math.trunc(Number(deltaMs));
+
+    if (!Number.isFinite(normalizedDeltaMs) || normalizedDeltaMs === 0) {
+      return 0;
+    }
+
+    return Math.max(-normalizedBaseTotalMs, normalizedDeltaMs);
+  }
+
   function createDefaultSettings() {
     return {
       dailyTargetHours: DEFAULT_DAILY_TARGET_HOURS,
@@ -329,6 +466,8 @@
       language: DEFAULT_LANGUAGE,
       dateFormat: DEFAULT_DATE_FORMAT,
       weekStart: DEFAULT_WEEK_START,
+      dayRolloverTime: DEFAULT_DAY_ROLLOVER_TIME,
+      theme: DEFAULT_THEME,
       autostart: false,
       autoBackup: false,
     };
@@ -367,6 +506,7 @@
     delete days[key];
   }
 
+
   function addLegacyTotalToDays(days, key, durationMs, source = DEFAULT_LEGACY_SOURCE) {
     if (!isPlainObject(days)) {
       throw new TypeError("addLegacyTotalToDays expects a days object.");
@@ -395,7 +535,47 @@
     return true;
   }
 
-  function addIntervalToDays(days, startMs, endMs, source = DEFAULT_INTERVAL_SOURCE) {
+  function addManualAdjustmentToDays(days, key, deltaMs, source = DEFAULT_MANUAL_ADJUSTMENT_SOURCE) {
+    if (!isPlainObject(days)) {
+      throw new TypeError("addManualAdjustmentToDays expects a days object.");
+    }
+
+    if (!DAY_KEY_PATTERN.test(key)) {
+      return false;
+    }
+
+    const normalizedDeltaMs = Math.trunc(Number(deltaMs));
+    if (!Number.isFinite(normalizedDeltaMs) || normalizedDeltaMs === 0) {
+      return false;
+    }
+
+    const dayRecord = ensureDayRecord(days, key);
+    if (!dayRecord) {
+      return false;
+    }
+
+    dayRecord.entries.push({
+      type: ENTRY_TYPE_MANUAL_ADJUSTMENT,
+      deltaMs: normalizedDeltaMs,
+      source: sanitizeEntrySource(source, DEFAULT_MANUAL_ADJUSTMENT_SOURCE),
+    });
+
+    return true;
+  }
+
+  function getBusinessDayBoundsForInstant(date, dayRolloverTime = DEFAULT_DAY_ROLLOVER_TIME) {
+    const dayDate = getBusinessDayDateFromInstant(date, dayRolloverTime);
+    const bounds = getBusinessDayBoundsForLabelDate(dayDate, dayRolloverTime);
+
+    return {
+      dayDate,
+      dayKey: dateKey(dayDate),
+      startMs: bounds.startMs,
+      endMs: bounds.endMs,
+    };
+  }
+
+  function addIntervalToDays(days, startMs, endMs, source = DEFAULT_INTERVAL_SOURCE, options = {}) {
     if (!isPlainObject(days)) {
       throw new TypeError("addIntervalToDays expects a days object.");
     }
@@ -411,17 +591,13 @@
     }
 
     const normalizedSource = sanitizeEntrySource(source, DEFAULT_INTERVAL_SOURCE);
+    const dayRolloverTime = sanitizeDayRolloverTime(options.dayRolloverTime, DEFAULT_DAY_ROLLOVER_TIME);
     let cursorMs = normalizedStartMs;
 
     while (cursorMs < normalizedEndMs) {
-      const current = new Date(cursorMs);
-      const nextMidnightMs = new Date(
-        current.getFullYear(),
-        current.getMonth(),
-        current.getDate() + 1,
-      ).getTime();
-      const segmentEndMs = Math.min(normalizedEndMs, nextMidnightMs);
-      const dayRecord = ensureDayRecord(days, dateKey(current));
+      const currentDay = getBusinessDayBoundsForInstant(new Date(cursorMs), dayRolloverTime);
+      const segmentEndMs = Math.min(normalizedEndMs, currentDay.endMs);
+      const dayRecord = ensureDayRecord(days, currentDay.dayKey);
 
       if (dayRecord && segmentEndMs > cursorMs) {
         dayRecord.entries.push({
@@ -438,7 +614,11 @@
     return true;
   }
 
-  function sumDayEntries(entries) {
+  function sumDayEntries(entries, options = {}) {
+    const includeIntervals = options.includeIntervals !== false;
+    const includeLegacyTotals = options.includeLegacyTotals !== false;
+    const includeManualAdjustments = options.includeManualAdjustments !== false;
+
     if (!Array.isArray(entries)) {
       return 0;
     }
@@ -451,19 +631,21 @@
       }
 
       if (entry.type === ENTRY_TYPE_INTERVAL) {
-        const startMs = Math.trunc(Number(entry.startMs));
-        const endMs = Math.trunc(Number(entry.endMs));
-        if (Number.isFinite(startMs) && Number.isFinite(endMs) && endMs > startMs) {
-          totalMs += endMs - startMs;
+        if (includeIntervals) {
+          totalMs += getIntervalDurationMs(entry);
         }
         continue;
       }
 
       if (entry.type === ENTRY_TYPE_LEGACY_TOTAL) {
-        const durationMs = Math.trunc(Number(entry.durationMs));
-        if (Number.isFinite(durationMs) && durationMs > 0) {
-          totalMs += durationMs;
+        if (includeLegacyTotals) {
+          totalMs += getLegacyTotalDurationMs(entry);
         }
+        continue;
+      }
+
+      if (entry.type === ENTRY_TYPE_MANUAL_ADJUSTMENT && includeManualAdjustments) {
+        totalMs += getManualAdjustmentDeltaMs(entry);
       }
     }
 
@@ -479,12 +661,215 @@
     return Array.isArray(days[key]?.entries) ? days[key].entries : [];
   }
 
+  function getDayBaseWorkMs(days, dayOrKey) {
+    return sumDayEntries(getDayEntries(days, dayOrKey), {
+      includeManualAdjustments: false,
+    });
+  }
+
+  function getDayManualAdjustmentMs(days, dayOrKey) {
+    return sumDayEntries(getDayEntries(days, dayOrKey), {
+      includeIntervals: false,
+      includeLegacyTotals: false,
+    });
+  }
+
+  function getDayEffectiveWorkMs(days, dayOrKey) {
+    const totalMs = getDayBaseWorkMs(days, dayOrKey) + getDayManualAdjustmentMs(days, dayOrKey);
+    return Math.max(0, totalMs);
+  }
+
+  function getDayIntervalWorkMs(days, dayOrKey) {
+    return sumDayEntries(getDayEntries(days, dayOrKey), {
+      includeLegacyTotals: false,
+      includeManualAdjustments: false,
+    });
+  }
+
+  function getDayLegacyTotalMs(days, dayOrKey) {
+    return sumDayEntries(getDayEntries(days, dayOrKey), {
+      includeIntervals: false,
+      includeManualAdjustments: false,
+    });
+  }
+
+  function getDayIntervalCount(days, dayOrKey) {
+    let count = 0;
+
+    for (const entry of getDayEntries(days, dayOrKey)) {
+      if (entry?.type === ENTRY_TYPE_INTERVAL && getIntervalDurationMs(entry) > 0) {
+        count += 1;
+      }
+    }
+
+    return count;
+  }
+
+  function getDayIntervalDurations(days, dayOrKey) {
+    return getDayEntries(days, dayOrKey)
+      .filter((entry) => entry?.type === ENTRY_TYPE_INTERVAL && getIntervalDurationMs(entry) > 0)
+      .sort((first, second) => {
+        const startDiff = Math.trunc(Number(first.startMs)) - Math.trunc(Number(second.startMs));
+        if (startDiff !== 0) {
+          return startDiff;
+        }
+
+        return Math.trunc(Number(first.endMs)) - Math.trunc(Number(second.endMs));
+      })
+      .map((entry) => getIntervalDurationMs(entry));
+  }
+
+  function getDisplayEntrySortRank(type) {
+    if (type === ENTRY_TYPE_INTERVAL) {
+      return 0;
+    }
+
+    if (type === ENTRY_TYPE_LEGACY_TOTAL) {
+      return 1;
+    }
+
+    if (type === ENTRY_TYPE_MANUAL_ADJUSTMENT) {
+      return 2;
+    }
+
+    return 99;
+  }
+
+  function getDisplayEntriesForDay(days, dayOrKey) {
+    const displayEntries = [];
+
+    for (const entry of getDayEntries(days, dayOrKey)) {
+      if (!isPlainObject(entry)) {
+        continue;
+      }
+
+      if (entry.type === ENTRY_TYPE_INTERVAL) {
+        const durationMs = getIntervalDurationMs(entry);
+        if (durationMs > 0) {
+          displayEntries.push({
+            type: ENTRY_TYPE_INTERVAL,
+            source: sanitizeEntrySource(entry.source, DEFAULT_INTERVAL_SOURCE),
+            startMs: Math.trunc(Number(entry.startMs)),
+            endMs: Math.trunc(Number(entry.endMs)),
+            durationMs,
+          });
+        }
+        continue;
+      }
+
+      if (entry.type === ENTRY_TYPE_LEGACY_TOTAL) {
+        const durationMs = getLegacyTotalDurationMs(entry);
+        if (durationMs > 0) {
+          displayEntries.push({
+            type: ENTRY_TYPE_LEGACY_TOTAL,
+            source: sanitizeEntrySource(entry.source, DEFAULT_LEGACY_SOURCE),
+            durationMs,
+          });
+        }
+        continue;
+      }
+
+      if (entry.type === ENTRY_TYPE_MANUAL_ADJUSTMENT) {
+        const deltaMs = getManualAdjustmentDeltaMs(entry);
+        if (deltaMs !== 0) {
+          displayEntries.push({
+            type: ENTRY_TYPE_MANUAL_ADJUSTMENT,
+            source: sanitizeEntrySource(entry.source, DEFAULT_MANUAL_ADJUSTMENT_SOURCE),
+            deltaMs,
+            durationMs: Math.abs(deltaMs),
+          });
+        }
+      }
+    }
+
+    displayEntries.sort((first, second) => {
+      const rankDiff = getDisplayEntrySortRank(first.type) - getDisplayEntrySortRank(second.type);
+      if (rankDiff !== 0) {
+        return rankDiff;
+      }
+
+      if (first.type === ENTRY_TYPE_INTERVAL && second.type === ENTRY_TYPE_INTERVAL) {
+        const startDiff = first.startMs - second.startMs;
+        if (startDiff !== 0) {
+          return startDiff;
+        }
+
+        return first.endMs - second.endMs;
+      }
+
+      return 0;
+    });
+
+    return displayEntries;
+  }
+
   function getDayWorkMs(days, dayOrKey) {
-    return sumDayEntries(getDayEntries(days, dayOrKey));
+    return getDayEffectiveWorkMs(days, dayOrKey);
   }
 
   function getWorkMsForDate(days, date) {
-    return getDayWorkMs(days, date);
+    return getDayEffectiveWorkMs(days, date);
+  }
+
+  function setDayManualTotal(days, dayOrKey, desiredTotalMs, source = DEFAULT_MANUAL_ADJUSTMENT_SOURCE) {
+    if (!isPlainObject(days)) {
+      throw new TypeError("setDayManualTotal expects a days object.");
+    }
+
+    const key = typeof dayOrKey === "string" ? dayOrKey : dateKey(dayOrKey);
+    if (!DAY_KEY_PATTERN.test(key)) {
+      throw new TypeError("setDayManualTotal expects a valid day key.");
+    }
+
+    const normalizedDesiredTotalMs = Math.trunc(Number(desiredTotalMs));
+    if (!Number.isFinite(normalizedDesiredTotalMs)) {
+      throw new RangeError("setDayManualTotal expects a finite desired total.");
+    }
+
+    if (normalizedDesiredTotalMs < 0) {
+      throw new RangeError("setDayManualTotal does not allow negative totals.");
+    }
+
+    const baseTotalMs = getDayBaseWorkMs(days, key);
+    const manualAdjustmentMs = clampManualAdjustmentDelta(baseTotalMs, normalizedDesiredTotalMs - baseTotalMs);
+    const currentEntries = getDayEntries(days, key);
+    const previousManualEntries = currentEntries.filter(
+      (entry) => entry?.type === ENTRY_TYPE_MANUAL_ADJUSTMENT && getManualAdjustmentDeltaMs(entry) !== 0,
+    );
+    const previousManualAdjustmentMs = getDayManualAdjustmentMs(days, key);
+    const normalizedSource = sanitizeEntrySource(source, DEFAULT_MANUAL_ADJUSTMENT_SOURCE);
+    const previousSource = previousManualEntries.length === 1
+      ? sanitizeEntrySource(previousManualEntries[0].source, DEFAULT_MANUAL_ADJUSTMENT_SOURCE)
+      : null;
+    const changed = previousManualEntries.length !== (manualAdjustmentMs === 0 ? 0 : 1) ||
+      previousManualAdjustmentMs !== manualAdjustmentMs ||
+      (manualAdjustmentMs !== 0 && previousSource !== normalizedSource);
+
+    const nextEntries = currentEntries.filter((entry) => entry?.type !== ENTRY_TYPE_MANUAL_ADJUSTMENT);
+
+    if (nextEntries.length > 0 || manualAdjustmentMs !== 0) {
+      const dayRecord = ensureDayRecord(days, key);
+      dayRecord.entries = nextEntries;
+
+      if (manualAdjustmentMs !== 0) {
+        dayRecord.entries.push({
+          type: ENTRY_TYPE_MANUAL_ADJUSTMENT,
+          deltaMs: manualAdjustmentMs,
+          source: normalizedSource,
+        });
+      }
+
+      removeEmptyDayRecord(days, key);
+    } else {
+      delete days[key];
+    }
+
+    return {
+      changed,
+      baseTotalMs,
+      effectiveTotalMs: getDayEffectiveWorkMs(days, key),
+      manualAdjustmentMs,
+    };
   }
 
   function clearDayEntries(days, key) {
@@ -504,6 +889,49 @@
     return true;
   }
 
+  function normalizeDayEntries(days, key, entries) {
+    if (!DAY_KEY_PATTERN.test(key) || !Array.isArray(entries)) {
+      return;
+    }
+
+    let manualAdjustmentMs = 0;
+    let manualSource = DEFAULT_MANUAL_ADJUSTMENT_SOURCE;
+
+    for (const entry of entries) {
+      if (!isPlainObject(entry)) {
+        continue;
+      }
+
+      if (entry.type === ENTRY_TYPE_INTERVAL) {
+        addIntervalToDays(days, entry.startMs, entry.endMs, entry.source);
+        continue;
+      }
+
+      if (entry.type === ENTRY_TYPE_LEGACY_TOTAL) {
+        addLegacyTotalToDays(days, key, entry.durationMs, entry.source);
+        continue;
+      }
+
+      if (entry.type === ENTRY_TYPE_MANUAL_ADJUSTMENT) {
+        const deltaMs = getManualAdjustmentDeltaMs(entry);
+        if (deltaMs !== 0) {
+          manualAdjustmentMs += deltaMs;
+          manualSource = sanitizeEntrySource(entry.source, DEFAULT_MANUAL_ADJUSTMENT_SOURCE);
+        }
+      }
+    }
+
+    const normalizedManualAdjustmentMs = clampManualAdjustmentDelta(
+      getDayBaseWorkMs(days, key),
+      manualAdjustmentMs,
+    );
+    if (normalizedManualAdjustmentMs !== 0) {
+      addManualAdjustmentToDays(days, key, normalizedManualAdjustmentMs, manualSource);
+    }
+
+    removeEmptyDayRecord(days, key);
+  }
+
   function normalizeDays(value) {
     if (!isPlainObject(value)) {
       return {};
@@ -512,22 +940,7 @@
     const days = {};
 
     for (const [key, dayRecord] of Object.entries(value)) {
-      const entries = Array.isArray(dayRecord?.entries) ? dayRecord.entries : [];
-
-      for (const entry of entries) {
-        if (!isPlainObject(entry)) {
-          continue;
-        }
-
-        if (entry.type === ENTRY_TYPE_INTERVAL) {
-          addIntervalToDays(days, entry.startMs, entry.endMs, entry.source);
-          continue;
-        }
-
-        if (entry.type === ENTRY_TYPE_LEGACY_TOTAL) {
-          addLegacyTotalToDays(days, key, entry.durationMs, entry.source);
-        }
-      }
+      normalizeDayEntries(days, key, Array.isArray(dayRecord?.entries) ? dayRecord.entries : []);
     }
 
     for (const key of Object.keys(days)) {
@@ -609,7 +1022,7 @@
     return logs[key];
   }
 
-  function addElapsedTimeToLogs(logs, startMs, endMs) {
+  function addElapsedTimeToLogs(logs, startMs, endMs, options = {}) {
     if (!isPlainObject(logs)) {
       throw new TypeError("addElapsedTimeToLogs expects a logs object.");
     }
@@ -624,17 +1037,13 @@
       return false;
     }
 
+    const dayRolloverTime = sanitizeDayRolloverTime(options.dayRolloverTime, DEFAULT_DAY_ROLLOVER_TIME);
     let cursorMs = normalizedStartMs;
 
     while (cursorMs < normalizedEndMs) {
-      const current = new Date(cursorMs);
-      const nextMidnightMs = new Date(
-        current.getFullYear(),
-        current.getMonth(),
-        current.getDate() + 1,
-      ).getTime();
-      const segmentEndMs = Math.min(normalizedEndMs, nextMidnightMs);
-      const record = ensureLogRecord(logs, dateKey(current));
+      const currentDay = getBusinessDayBoundsForInstant(new Date(cursorMs), dayRolloverTime);
+      const segmentEndMs = Math.min(normalizedEndMs, currentDay.endMs);
+      const record = ensureLogRecord(logs, currentDay.dayKey);
 
       record.workMs += segmentEndMs - cursorMs;
       cursorMs = segmentEndMs;
@@ -663,6 +1072,7 @@
   function getClearDayState({
     selectedDate,
     todayDate = new Date(),
+    dayRolloverTime = DEFAULT_DAY_ROLLOVER_TIME,
     isTimerRunning = false,
     storedWorkMs = 0,
   }) {
@@ -673,7 +1083,9 @@
       throw new TypeError("getClearDayState expects valid selectedDate and todayDate values.");
     }
 
-    if (Boolean(isTimerRunning) && isSameDay(startOfDay(selectedDate), startOfDay(todayDate))) {
+    const currentDay = startOfDay(getBusinessDayDateFromInstant(todayDate, dayRolloverTime));
+
+    if (Boolean(isTimerRunning) && isSameDay(startOfDay(selectedDate), currentDay)) {
       return {
         canClear: false,
         reason: "running-today",
@@ -702,6 +1114,7 @@
 
   function calculateCurrentStreak({
     nowDate = new Date(),
+    dayRolloverTime = DEFAULT_DAY_ROLLOVER_TIME,
     isDayOff,
     getWorkMsForDate,
     maxLookbackDays = 4000,
@@ -710,7 +1123,7 @@
       throw new TypeError("calculateCurrentStreak expects isDayOff and getWorkMsForDate callbacks.");
     }
 
-    const cursor = startOfDay(nowDate);
+    const cursor = startOfDay(getBusinessDayDateFromInstant(nowDate, dayRolloverTime));
     let safety = 0;
 
     while (safety < maxLookbackDays && isDayOff(cursor)) {
@@ -754,6 +1167,7 @@
     return streak;
   }
 
+
   return {
     addElapsedTimeToLogs,
     addIntervalToDays,
@@ -765,15 +1179,27 @@
     createPersistedState,
     createRuntimeState,
     dateKey,
+    DEFAULT_DAY_ROLLOVER_TIME,
     formatCompactWork,
     formatDayWord,
     formatDetailedWork,
     formatDuration,
     formatMonthTitle,
     formatSelectedDate,
+    getBusinessDayBoundsForLabelDate,
+    getBusinessDayDateFromInstant,
+    getBusinessDayKeyFromInstant,
     getClearDayState,
+    getDayBaseWorkMs,
+    getDayEffectiveWorkMs,
     getDayEntries,
+    getDayIntervalCount,
+    getDayIntervalDurations,
+    getDayIntervalWorkMs,
+    getDayLegacyTotalMs,
+    getDayManualAdjustmentMs,
     getDayWorkMs,
+    getDisplayEntriesForDay,
     getWorkMsForDate,
     isSameDay,
     isSameMonth,
@@ -783,11 +1209,14 @@
     sanitizeDailyTargetHours,
     sanitizeDateFormat,
     sanitizeDayOverrides,
+    sanitizeDayRolloverTime,
     sanitizeLogs,
     sanitizeSettings,
+    sanitizeTheme,
     sanitizeTimerState,
     sanitizeWeekStart,
     sanitizeWeekendDays,
+    setDayManualTotal,
     shouldForceWorkOverrideOnTimerStart,
     startOfDay,
     startOfMonth,

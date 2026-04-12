@@ -36,10 +36,9 @@
     }
 
     const nowMs = resolveNowMs(options.nowMs);
-    const dayStartMs = trackerCore.startOfDay(date).getTime();
-    const nextDayStartMs = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1).getTime();
-    const overlapStartMs = Math.max(runtime.lastTickMs, dayStartMs);
-    const overlapEndMs = Math.min(nowMs, nextDayStartMs);
+    const dayBounds = trackerCore.getBusinessDayBoundsForLabelDate(date, options.dayRolloverTime);
+    const overlapStartMs = Math.max(runtime.lastTickMs, dayBounds.startMs);
+    const overlapEndMs = Math.min(nowMs, dayBounds.endMs);
 
     return Math.max(0, overlapEndMs - overlapStartMs);
   }
@@ -54,7 +53,9 @@
     }
 
     const nowMs = resolveNowMs(options.nowMs);
-    const changed = trackerCore.addIntervalToDays(days, runtime.lastTickMs, nowMs, options.source ?? "timer");
+    const changed = trackerCore.addIntervalToDays(days, runtime.lastTickMs, nowMs, options.source ?? "timer", {
+      dayRolloverTime: options.dayRolloverTime,
+    });
     runtime.lastTickMs = nowMs;
     return changed;
   }

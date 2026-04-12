@@ -1,13 +1,14 @@
-﻿# Architecture
+# Architecture
 
 ## Overview
 
 The renderer is split into three layers:
 
-- `src/renderer/tracker-core.js`: pure domain logic for persisted-state normalization, `v7 -> v8` migration, interval splitting, day selectors, and streak calculations.
+- `src/renderer/tracker-core.js`: pure domain logic for persisted-state normalization, `v7 -> v8` migration, interval splitting, `manual-adjustment` handling, day selectors, and streak calculations.
 - `src/renderer/tracker-storage.js`: persistence boundary for `localStorage` keys and backup snapshot normalization.
 - `src/renderer/tracker-timer.js`: runtime timer behavior for start/stop/flush, suspend/resume, and live overlap calculations.
 - `src/renderer/app.js`: UI wiring, DOM access, event handlers, rendering, and Electron-facing coordination.
+- `src/assets/tray/*.png`: runtime tray icon assets for packaged and dev runs; `build/icon.ico` remains the installer/exe icon.
 
 `src/main.js` and `src/preload.js` remain transport-only for import/export, bootstrap state, tray commands, and system events.
 
@@ -31,6 +32,11 @@ The persisted format is `v8` and uses day records instead of `logs[dateKey].work
           "type": "legacy-total",
           "durationMs": 5400000,
           "source": "migrated-v7"
+        },
+        {
+          "type": "manual-adjustment",
+          "deltaMs": 1800000,
+          "source": "manual-edit"
         }
       ]
     }
@@ -42,6 +48,8 @@ The persisted format is `v8` and uses day records instead of `logs[dateKey].work
     "language": "ru",
     "dateFormat": "localized",
     "weekStart": "monday",
+    "dayRolloverTime": "06:00",
+    "theme": "auto",
     "autostart": false,
     "autoBackup": false
   },
@@ -53,10 +61,14 @@ The persisted format is `v8` and uses day records instead of `logs[dateKey].work
 
 ## Data Invariants
 
-- Day keys use `YYYY-MM-DD` in local calendar time.
+- Day keys use `YYYY-MM-DD` in local calendar time and are interpreted with the configured rollover boundary.
 - `interval` entries never cross midnight inside one stored entry.
 - Day totals are derived from entries; there is no separate persisted `workMs` source of truth.
 - `legacy-total` is only for migrated or imported aggregate data from older formats.
+- `manual-adjustment` is the only Phase 4 write path for manual day edits.
+- At most one non-zero `manual-adjustment` is kept per day after normalization/upsert.
+- Effective day totals are clamped to `>= 0`.
+- `settings.theme` accepts `light | dark | auto`; `auto` follows the OS color-scheme preference live.
 - Empty days are not stored.
 
 ## Migration And Rollback
@@ -71,12 +83,26 @@ The persisted format is `v8` and uses day records instead of `logs[dateKey].work
 
 - Live runtime timer state is not restored as a running session on cold start.
 - On flush, timer time is written as `interval` entries via `tracker-timer` and `tracker-core`.
-- If a session crosses midnight, it is split into separate per-day interval entries before persistence.
+- If a session crosses the configured day rollover boundary, it is split into separate per-day interval entries before persistence.
+
+## Effective Totals
+
+- `base total` = sum of persisted `interval` and `legacy-total` entries for the day.
+- `effective total` = `base total + manual-adjustment`, clamped to `>= 0`.
+- Calendar cells, selected-day totals, streak logic, import/export, and backup snapshots operate on the effective total.
+- Real timer intervals remain read-only in Phase 4; the UI never rewrites stored `startMs` / `endMs`.
+
+## Day Menu UI Flow
+
+- `src/renderer/app.js` renders selected-day actions inline and opens a compact `day menu` popup for per-day detail inspection.
+- The day menu distinguishes real timer intervals, migrated/imported aggregate totals, and manual adjustments via `trackerCore.getDisplayEntriesForDay(...)`.
+- Manual editing opens a dedicated in-window overlay from the day menu and saves through `trackerCore.setDayManualTotal(...)`.
+- The overlay edits the desired day total in minute precision and lets the domain layer derive the resulting `manual-adjustment`.
 
 ## Backup Contract
 
 - Renderer exports and imports full snapshots.
+- Global import/export entry points live in `Settings > Data`; selected-day actions no longer host backup controls.
 - `tracker-storage` accepts two import shapes: full `v8` persisted snapshots (`version`, `days`, `settings`, `timerState`) and legacy `logs` snapshots.
 - When `minimal-worktime-tracker.v8` is malformed, storage loading ignores it and continues fallback lookup through `v7 ... v1`.
 - Electron main/preload do not interpret tracker business data.
-

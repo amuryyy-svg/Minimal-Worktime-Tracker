@@ -3,6 +3,8 @@ node_modules/
 
 # Local runtime data
 .runtime/
+.codex/
+/__orig_Logo.png
 
 # Build and release outputs
 dist/

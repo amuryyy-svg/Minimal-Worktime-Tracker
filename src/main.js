@@ -1,4 +1,4 @@
-﻿const fs = require("fs");
+const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { app, BrowserWindow, dialog, ipcMain, Menu, Tray, nativeImage, powerMonitor, screen } = require("electron");
@@ -13,10 +13,10 @@ const trackerCore = require("./renderer/tracker-core.js");
 
 const TRAY_TEXT = {
   ru: {
-    openWindow: "\u041e\u0442\u043a\u0440\u044b\u0442\u044c",
+    openWindow: "\u041f\u043e\u043a\u0430\u0437\u0430\u0442\u044c",
     hideWindow: "\u0421\u043a\u0440\u044b\u0442\u044c",
     startTimer: "\u0417\u0430\u043f\u0443\u0441\u0442\u0438\u0442\u044c",
-    stopTimer: "\u041e\u0441\u0442\u0430\u043d\u043e\u0432\u0438\u0442\u044c",
+    stopTimer: "\u041f\u0430\u0443\u0437\u0430",
     exit: "\u0412\u044b\u0445\u043e\u0434",
     tooltipRunning: "\u0418\u0434\u0451\u0442 \u0440\u0430\u0431\u043e\u0447\u0435\u0435 \u0432\u0440\u0435\u043c\u044f",
     tooltipIdle: "\u0422\u0440\u0435\u043a\u0435\u0440 \u0440\u0430\u0431\u043e\u0447\u0435\u0433\u043e \u0432\u0440\u0435\u043c\u0435\u043d\u0438",
@@ -25,7 +25,7 @@ const TRAY_TEXT = {
     openWindow: "Show",
     hideWindow: "Hide",
     startTimer: "Start",
-    stopTimer: "Stop",
+    stopTimer: "Pause",
     exit: "Exit",
     tooltipRunning: "Work time is running",
     tooltipIdle: "Work time tracker",
@@ -71,10 +71,8 @@ app.setPath("userData", userDataPath);
 app.setPath("sessionData", sessionDataPath);
 app.commandLine.appendSwitch("disk-cache-dir", cachePath);
 
-const appIconPath = path.join(__dirname, "..", "Logo.png");
-const appIcon = nativeImage.createFromPath(appIconPath);
-
-if (appIcon.isEmpty()) {
+const appIconPath = path.join(__dirname, "..", "Logo.ico");
+if (!fs.existsSync(appIconPath)) {
   throw new Error(`Unable to load app icon: ${appIconPath}`);
 }
 
@@ -82,6 +80,11 @@ let mainWindow;
 let tray;
 let isQuitting = false;
 const shouldStartHidden = getBootstrapState().launchedAtLogin === true;
+const trayIcon = nativeImage.createFromPath(appIconPath);
+
+if (trayIcon.isEmpty()) {
+  throw new Error(`Unable to load tray icon: ${appIconPath}`);
+}
 
 const trayState = {
   isRunning: false,
@@ -119,10 +122,7 @@ function getApplicationSession() {
 }
 
 function createTrayIcon() {
-  return appIcon.resize({
-    width: 18,
-    height: 18,
-  });
+  return trayIcon;
 }
 
 function sendTrayCommand(command) {
@@ -219,6 +219,7 @@ function updateTrayMenu() {
     },
   ]);
 
+  tray.setImage(createTrayIcon());
   tray.setContextMenu(contextMenu);
   tray.setToolTip(trayState.isRunning ? text.tooltipRunning : text.tooltipIdle);
 }
@@ -233,7 +234,7 @@ function createWindow() {
     titleBarStyle: "hidden",
     autoHideMenuBar: true,
     backgroundColor: "#ffffff",
-    icon: appIcon,
+    icon: appIconPath,
     show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -262,6 +263,15 @@ function createWindow() {
     hideWindow();
   });
 
+  mainWindow.on("minimize", (event) => {
+    if (isQuitting) {
+      return;
+    }
+
+    event.preventDefault();
+    hideWindow();
+  });
+
   mainWindow.on("show", () => {
     mainWindow.setSkipTaskbar(false);
     updateTrayMenu();
@@ -280,12 +290,22 @@ function createTray() {
 }
 
 ipcMain.on("timer-state", (_event, payload) => {
-  trayState.isRunning = Boolean(payload?.isRunning);
+  const nextIsRunning = Boolean(payload?.isRunning);
+  if (trayState.isRunning === nextIsRunning) {
+    return;
+  }
+
+  trayState.isRunning = nextIsRunning;
   updateTrayMenu();
 });
 
 ipcMain.on("settings-state", (_event, payload) => {
-  trayState.language = payload?.language === "en" ? "en" : "ru";
+  const nextLanguage = payload?.language === "en" ? "en" : "ru";
+  if (trayState.language === nextLanguage) {
+    return;
+  }
+
+  trayState.language = nextLanguage;
   updateTrayMenu();
 });
 
@@ -323,7 +343,7 @@ ipcMain.handle("backup:export", async (_event, snapshot) => {
     throw new TypeError("backup:export expects a snapshot object.");
   }
 
-  const filename = `work-tracker-backup-${trackerCore.dateKey(new Date())}.json`;
+  const filename = `work-tracker-backup-${trackerCore.getBusinessDayKeyFromInstant(new Date(), snapshot?.settings?.dayRolloverTime)}.json`;
   const ownerWindow = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
   const { canceled, filePath } = await dialog.showSaveDialog(ownerWindow, {
     defaultPath: path.join(app.getPath("documents"), filename),
@@ -345,7 +365,10 @@ ipcMain.handle("backup:auto", async (_event, snapshot) => {
     throw new TypeError("backup:auto expects a snapshot object.");
   }
 
-  const filePath = path.join(autoBackupPath, "work-tracker-auto-backup-" + trackerCore.dateKey(new Date()) + ".json");
+  const filePath = path.join(
+    autoBackupPath,
+    `work-tracker-auto-backup-${trackerCore.getBusinessDayKeyFromInstant(new Date(), snapshot?.settings?.dayRolloverTime)}.json`,
+  );
   await fs.promises.writeFile(filePath, JSON.stringify(snapshot, null, 2), "utf8");
   return { saved: true, filePath };
 });
@@ -440,5 +463,3 @@ app.whenReady().then(() => {
     showMainWindow();
   });
 });
-
-

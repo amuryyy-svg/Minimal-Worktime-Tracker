@@ -1,6 +1,9 @@
 const DEFAULT_WEEK_START = "monday";
 const DEFAULT_LANGUAGE = "ru";
 const DEFAULT_DATE_FORMAT = "localized";
+const DEFAULT_THEME = "light";
+const DEFAULT_DAY_ROLLOVER_TIME = "06:00";
+const DAY_ROLLOVER_STEP_MINUTES = 15;
 const DATE_FORMAT_LABELS = {
   ru: {
     label: "\u0424\u043e\u0440\u043c\u0430\u0442 \u0434\u0430\u0442\u044b",
@@ -37,6 +40,9 @@ const LANGUAGE_PACKS = {
     prevMonthLabel: "\u041f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0438\u0439 \u043c\u0435\u0441\u044f\u0446",
     nextMonthLabel: "\u0421\u043b\u0435\u0434\u0443\u044e\u0449\u0438\u0439 \u043c\u0435\u0441\u044f\u0446",
     weekendLabel: "\u0420\u0435\u0433\u0443\u043b\u044f\u0440\u043d\u044b\u0435 \u0432\u044b\u0445\u043e\u0434\u043d\u044b\u0435",
+    dayRolloverLabel: "\u0412\u0440\u0435\u043c\u044f \u0441\u043c\u0435\u043d\u044b \u0434\u043d\u044f",
+    dayRolloverPrevLabel: "\u0420\u0430\u043d\u044c\u0448\u0435",
+    dayRolloverNextLabel: "\u041f\u043e\u0437\u0436\u0435",
     selectedDayOff: "\u0412\u044b\u0445\u043e\u0434\u043d\u043e\u0439",
     importBackup: "\u0418\u043c\u043f\u043e\u0440\u0442",
     exportBackup: "\u042d\u043a\u0441\u043f\u043e\u0440\u0442",
@@ -47,6 +53,9 @@ const LANGUAGE_PACKS = {
     settingsTitle: "\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438",
     settingsOpenLabel: "\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438",
     settingsCloseLabel: "\u0417\u0430\u043a\u0440\u044b\u0442\u044c \u043d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438",
+    themeLabel: "\u0422\u0435\u043c\u0430",
+    themeLight: "\u0421\u0432\u0435\u0442\u043b\u0430\u044f",
+    themeDark: "\u0422\u0451\u043c\u043d\u0430\u044f",
     languageLabel: "\u042f\u0437\u044b\u043a",
     languageRu: "\u0420\u0443\u0441\u0441\u043a\u0438\u0439",
     languageEn: "English",
@@ -143,6 +152,9 @@ const LANGUAGE_PACKS = {
     prevMonthLabel: "Previous month",
     nextMonthLabel: "Next month",
     weekendLabel: "Regular weekends",
+    dayRolloverLabel: "Day rollover time",
+    dayRolloverPrevLabel: "Earlier",
+    dayRolloverNextLabel: "Later",
     selectedDayOff: "Day off",
     importBackup: "Import",
     exportBackup: "Export",
@@ -153,6 +165,9 @@ const LANGUAGE_PACKS = {
     settingsTitle: "Settings",
     settingsOpenLabel: "Settings",
     settingsCloseLabel: "Close settings",
+    themeLabel: "Theme",
+    themeLight: "Light",
+    themeDark: "Dark",
     languageLabel: "Language",
     languageRu: "Russian",
     languageEn: "English",
@@ -252,18 +267,82 @@ LANGUAGE_PACKS.en.clearDataSuccess = "Data cleared.";
 LANGUAGE_PACKS.en.clearDataFailed = "Unable to clear saved data.";
 LANGUAGE_PACKS.en.autostartFailed = "Unable to change autostart.";
 LANGUAGE_PACKS.en.cancelLabel = "Cancel";
-LANGUAGE_PACKS.ru.clearDayLabel = "Очистить день";
+LANGUAGE_PACKS.ru.themeAuto = "\u0410\u0432\u0442\u043e";
+LANGUAGE_PACKS.ru.dayMenuLabel = "\u041c\u0435\u043d\u044e \u0434\u043d\u044f";
+LANGUAGE_PACKS.ru.dayMenuCloseLabel = "\u0417\u0430\u043a\u0440\u044b\u0442\u044c \u043c\u0435\u043d\u044e \u0434\u043d\u044f";
+LANGUAGE_PACKS.en.themeAuto = "Auto";
+LANGUAGE_PACKS.en.dayMenuLabel = "Day menu";
+LANGUAGE_PACKS.en.dayMenuCloseLabel = "Close day menu";
+LANGUAGE_PACKS.ru.clearDayLabel = "Очистить";
 LANGUAGE_PACKS.ru.clearDayConfirmTitle = "Очистить день";
 LANGUAGE_PACKS.ru.clearDayConfirmMessage = "Будет очищено только учтённое время выбранного дня. Статус дня не изменится.";
 LANGUAGE_PACKS.ru.clearDayConfirmAction = "Очистить";
 LANGUAGE_PACKS.ru.clearDayBlockedRunning = "Остановите таймер перед очисткой сегодняшнего дня.";
 LANGUAGE_PACKS.ru.clearDaySuccess = "Время выбранного дня очищено.";
-LANGUAGE_PACKS.en.clearDayLabel = "Clear day";
+LANGUAGE_PACKS.en.clearDayLabel = "Clear";
 LANGUAGE_PACKS.en.clearDayConfirmTitle = "Clear day";
 LANGUAGE_PACKS.en.clearDayConfirmMessage = "Only the tracked time for the selected day will be cleared. The day status will stay the same.";
 LANGUAGE_PACKS.en.clearDayConfirmAction = "Clear";
 LANGUAGE_PACKS.en.clearDayBlockedRunning = "Stop the timer before clearing today.";
 LANGUAGE_PACKS.en.clearDaySuccess = "Selected day time cleared.";
+LANGUAGE_PACKS.ru.dayDetailsTitle = "Детали дня";
+LANGUAGE_PACKS.ru.editDayTime = "Исправить время";
+LANGUAGE_PACKS.ru.dayDetailsStoredLabel = "Сохранённый итог";
+LANGUAGE_PACKS.ru.dayDetailsBaseLabel = "База";
+LANGUAGE_PACKS.ru.dayDetailsAdjustmentLabel = "Корректировка";
+LANGUAGE_PACKS.ru.dayDetailsLiveLabel = "Текущая сессия";
+LANGUAGE_PACKS.ru.dayDetailsEmpty = "Сохранённых записей за этот день пока нет.";
+LANGUAGE_PACKS.ru.dayEntryIntervalKind = "Интервал";
+LANGUAGE_PACKS.ru.dayEntryIntervalNote = "Реальная сессия таймера. Редактирование интервала в этой фазе недоступно.";
+LANGUAGE_PACKS.ru.dayEntryLegacyKind = "Импорт";
+LANGUAGE_PACKS.ru.dayEntryLegacyTitle = "Мигрированный итог";
+LANGUAGE_PACKS.ru.dayEntryLegacyNote = "Импортированное или мигрированное агрегированное время без точного диапазона.";
+LANGUAGE_PACKS.ru.dayEntryManualKind = "Правка";
+LANGUAGE_PACKS.ru.dayEntryManualTitle = "Ручная корректировка";
+LANGUAGE_PACKS.ru.dayEntryManualNote = "Корректировка итогового времени дня без переписывания interval-записей.";
+LANGUAGE_PACKS.ru.manualEditTitle = "Исправить время дня";
+LANGUAGE_PACKS.ru.manualEditCurrentLabel = "Текущий итог";
+LANGUAGE_PACKS.ru.manualEditBaseLabel = "База без правки";
+LANGUAGE_PACKS.ru.manualEditAdjustmentLabel = "Будущая корректировка";
+LANGUAGE_PACKS.ru.manualEditHoursLabel = "Часы";
+LANGUAGE_PACKS.ru.manualEditMinutesLabel = "Минуты";
+LANGUAGE_PACKS.ru.manualEditCloseLabel = "Закрыть редактор дня";
+LANGUAGE_PACKS.ru.manualEditSave = "Сохранить";
+LANGUAGE_PACKS.ru.manualEditSaved = "Итог дня обновлён.";
+LANGUAGE_PACKS.ru.manualEditBlockedRunning = "Остановите таймер перед ручной правкой дня с активной сессией.";
+LANGUAGE_PACKS.ru.manualEditInvalidBlank = "Введите часы, минуты или оба значения.";
+LANGUAGE_PACKS.ru.manualEditInvalidHours = "Часы должны быть целым числом не меньше 0.";
+LANGUAGE_PACKS.ru.manualEditInvalidMinutes = "Минуты должны быть целым числом от 0 до 59.";
+LANGUAGE_PACKS.ru.manualEditInvalidTotal = "Не удалось вычислить итог дня.";
+LANGUAGE_PACKS.en.dayDetailsTitle = "Day details";
+LANGUAGE_PACKS.en.editDayTime = "Adjust time";
+LANGUAGE_PACKS.en.dayDetailsStoredLabel = "Stored total";
+LANGUAGE_PACKS.en.dayDetailsBaseLabel = "Base";
+LANGUAGE_PACKS.en.dayDetailsAdjustmentLabel = "Adjustment";
+LANGUAGE_PACKS.en.dayDetailsLiveLabel = "Live session";
+LANGUAGE_PACKS.en.dayDetailsEmpty = "There are no saved entries for this day yet.";
+LANGUAGE_PACKS.en.dayEntryIntervalKind = "Interval";
+LANGUAGE_PACKS.en.dayEntryIntervalNote = "Real timer session. Direct interval editing is not available in this phase.";
+LANGUAGE_PACKS.en.dayEntryLegacyKind = "Import";
+LANGUAGE_PACKS.en.dayEntryLegacyTitle = "Migrated total";
+LANGUAGE_PACKS.en.dayEntryLegacyNote = "Imported or migrated aggregate time without an exact clock range.";
+LANGUAGE_PACKS.en.dayEntryManualKind = "Manual";
+LANGUAGE_PACKS.en.dayEntryManualTitle = "Manual adjustment";
+LANGUAGE_PACKS.en.dayEntryManualNote = "Corrects the day total without rewriting interval timestamps.";
+LANGUAGE_PACKS.en.manualEditTitle = "Adjust day time";
+LANGUAGE_PACKS.en.manualEditCurrentLabel = "Current total";
+LANGUAGE_PACKS.en.manualEditBaseLabel = "Base without edit";
+LANGUAGE_PACKS.en.manualEditAdjustmentLabel = "Projected adjustment";
+LANGUAGE_PACKS.en.manualEditHoursLabel = "Hours";
+LANGUAGE_PACKS.en.manualEditMinutesLabel = "Minutes";
+LANGUAGE_PACKS.en.manualEditCloseLabel = "Close day editor";
+LANGUAGE_PACKS.en.manualEditSave = "Save";
+LANGUAGE_PACKS.en.manualEditSaved = "Day total updated.";
+LANGUAGE_PACKS.en.manualEditBlockedRunning = "Stop the timer before editing a day with an active session.";
+LANGUAGE_PACKS.en.manualEditInvalidBlank = "Enter hours, minutes, or both.";
+LANGUAGE_PACKS.en.manualEditInvalidHours = "Hours must be a whole number greater than or equal to 0.";
+LANGUAGE_PACKS.en.manualEditInvalidMinutes = "Minutes must be a whole number from 0 to 59.";
+LANGUAGE_PACKS.en.manualEditInvalidTotal = "Unable to calculate the day total.";
 
 const DEFAULT_DAILY_TARGET_HOURS = 6;
 const MIN_DAILY_TARGET_HOURS = 1;
@@ -287,6 +366,22 @@ const el = {
   selectedDayMeta: document.getElementById("selected-day-meta"),
   toggleDayOff: document.getElementById("toggle-day-off"),
   clearDay: document.getElementById("clear-day"),
+  dayMenuButton: document.getElementById("day-menu-button"),
+  dayDetailsTitle: document.getElementById("day-details-title"),
+  editDayTime: document.getElementById("edit-day-time"),
+  dayDetailsStoredLabel: document.getElementById("day-details-stored-label"),
+  dayDetailsStoredValue: document.getElementById("day-details-stored-value"),
+  dayDetailsBaseLabel: document.getElementById("day-details-base-label"),
+  dayDetailsBaseValue: document.getElementById("day-details-base-value"),
+  dayDetailsAdjustmentLabel: document.getElementById("day-details-adjustment-label"),
+  dayDetailsAdjustmentValue: document.getElementById("day-details-adjustment-value"),
+  dayDetailsLive: document.getElementById("day-details-live"),
+  dayDetailsEmpty: document.getElementById("day-details-empty"),
+  dayDetailsList: document.getElementById("day-details-list"),
+  dayMenuOverlay: document.getElementById("day-menu-overlay"),
+  dayMenuBackdrop: document.getElementById("day-menu-backdrop"),
+  dayMenuClose: document.getElementById("day-menu-close"),
+  dayMenuCaption: document.getElementById("day-menu-caption"),
   minimizeWindow: document.getElementById("window-minimize"),
   closeWindow: document.getElementById("window-close"),
   settingsButton: document.getElementById("window-settings"),
@@ -297,14 +392,22 @@ const el = {
   settingsLanguageLabel: document.getElementById("settings-language-label"),
   settingsLanguageRu: document.getElementById("settings-language-ru"),
   settingsLanguageEn: document.getElementById("settings-language-en"),
+  settingsThemeLabel: document.getElementById("settings-theme-label"),
+  settingsThemeLight: document.getElementById("settings-theme-light"),
+  settingsThemeAuto: document.getElementById("settings-theme-auto"),
+  settingsThemeDark: document.getElementById("settings-theme-dark"),
   settingsDateFormatLabel: document.getElementById("settings-date-format-label"),
   settingsDateFormatLocalized: document.getElementById("settings-date-format-localized"),
   settingsDateFormatDmy: document.getElementById("settings-date-format-dmy"),
   settingsDateFormatMdy: document.getElementById("settings-date-format-mdy"),
-  settingsWeekStartLabel: document.getElementById("settings-week-start-label"),
-  settingsWeekStartMonday: document.getElementById("settings-week-start-monday"),
-  settingsWeekStartSunday: document.getElementById("settings-week-start-sunday"),
-  settingsAutostartLabel: document.getElementById("settings-autostart-label"),
+    settingsWeekStartLabel: document.getElementById("settings-week-start-label"),
+    settingsWeekStartMonday: document.getElementById("settings-week-start-monday"),
+    settingsWeekStartSunday: document.getElementById("settings-week-start-sunday"),
+    settingsDayRolloverLabel: document.getElementById("settings-day-rollover-label"),
+    settingsDayRolloverPrev: document.getElementById("settings-day-rollover-prev"),
+    settingsDayRolloverValue: document.getElementById("settings-day-rollover-value"),
+    settingsDayRolloverNext: document.getElementById("settings-day-rollover-next"),
+    settingsAutostartLabel: document.getElementById("settings-autostart-label"),
   settingsAutostartOff: document.getElementById("settings-autostart-off"),
   settingsAutostartOn: document.getElementById("settings-autostart-on"),
   settingsAutoBackupLabel: document.getElementById("settings-auto-backup-label"),
@@ -322,6 +425,24 @@ const el = {
   confirmMessage: document.getElementById("confirm-message"),
   confirmCancel: document.getElementById("confirm-cancel"),
   confirmAccept: document.getElementById("confirm-accept"),
+  manualEditOverlay: document.getElementById("manual-edit-overlay"),
+  manualEditBackdrop: document.getElementById("manual-edit-backdrop"),
+  manualEditClose: document.getElementById("manual-edit-close"),
+  manualEditTitle: document.getElementById("manual-edit-title"),
+  manualEditForm: document.getElementById("manual-edit-form"),
+  manualEditCurrentLabel: document.getElementById("manual-edit-current-label"),
+  manualEditCurrentValue: document.getElementById("manual-edit-current-value"),
+  manualEditBaseLabel: document.getElementById("manual-edit-base-label"),
+  manualEditBaseValue: document.getElementById("manual-edit-base-value"),
+  manualEditAdjustmentLabel: document.getElementById("manual-edit-adjustment-label"),
+  manualEditAdjustmentValue: document.getElementById("manual-edit-adjustment-value"),
+  manualEditHoursLabel: document.getElementById("manual-edit-hours-label"),
+  manualEditHours: document.getElementById("manual-edit-hours"),
+  manualEditMinutesLabel: document.getElementById("manual-edit-minutes-label"),
+  manualEditMinutes: document.getElementById("manual-edit-minutes"),
+  manualEditError: document.getElementById("manual-edit-error"),
+  manualEditCancel: document.getElementById("manual-edit-cancel"),
+  manualEditSave: document.getElementById("manual-edit-save"),
 };
 
 const trackerCore = window.trackerCore;
@@ -349,8 +470,10 @@ let days = loadedState.days;
 let settings = loadedState.settings;
 const timerState = trackerTimer.createTimerRuntime(loadedState.timerState);
 
-let calendarCursor = startOfMonth(new Date());
-let selectedDate = startOfDay(new Date());
+const initialCurrentDay = trackerCore.getBusinessDayDateFromInstant(new Date(), settings.dayRolloverTime);
+let calendarCursor = startOfMonth(initialCurrentDay);
+let selectedDate = initialCurrentDay;
+let selectedDateFollowsCurrentDay = true;
 let saveTimeout = null;
 let lastAutoBackupDateKey = null;
 let pendingAutoBackupPromise = null;
@@ -361,7 +484,12 @@ let isAutostartSyncPending = false;
 let confirmDialogState = null;
 let pendingConfirmResolve = null;
 let confirmDialogReturnFocus = null;
+let dayMenuReturnFocus = null;
+let manualEditState = null;
 const calendarCellRefs = new Map();
+const systemThemeMediaQuery = typeof window.matchMedia === "function"
+  ? window.matchMedia("(prefers-color-scheme: dark)")
+  : null;
 
 function createDefaultPersistedState() {
   return trackerStorage.createDefaultPersistedState();
@@ -499,7 +627,7 @@ function maybeCreateAutoBackup() {
     return;
   }
 
-  const todayKey = dateKey(new Date());
+  const todayKey = getCurrentBusinessDayKey();
   if (lastAutoBackupDateKey === todayKey) {
     return;
   }
@@ -578,6 +706,8 @@ function applyPersistedState(nextState, bootstrapState = null) {
   days = runtimeState.days;
   settings = runtimeState.settings;
   trackerTimer.applyPersistedTimerState(timerState, runtimeState.timerState);
+  closeDayMenuOverlay({ returnFocus: false });
+  closeManualEditOverlay({ returnFocus: false });
 
   flushSave();
   syncTrayState();
@@ -634,6 +764,35 @@ function isSameMonth(first, second) {
   return first.getFullYear() === second.getFullYear() && first.getMonth() === second.getMonth();
 }
 
+function getCurrentBusinessDayDate(now = new Date()) {
+  return trackerCore.getBusinessDayDateFromInstant(now, settings.dayRolloverTime);
+}
+
+function getCurrentBusinessDayKey(now = new Date()) {
+  return trackerCore.getBusinessDayKeyFromInstant(now, settings.dayRolloverTime);
+}
+
+function syncCurrentDaySelection(now = new Date()) {
+  if (!selectedDateFollowsCurrentDay) {
+    return false;
+  }
+
+  const nextSelectedDate = getCurrentBusinessDayDate(now);
+  const nextCalendarCursor = startOfMonth(nextSelectedDate);
+  const selectedDateChanged = !isSameDay(selectedDate, nextSelectedDate);
+  const calendarCursorChanged = !isSameMonth(calendarCursor, nextCalendarCursor);
+
+  if (selectedDateChanged) {
+    selectedDate = nextSelectedDate;
+  }
+
+  if (calendarCursorChanged) {
+    calendarCursor = nextCalendarCursor;
+  }
+
+  return calendarCursorChanged;
+}
+
 function getWeekStartIndex() {
   return settings.weekStart === "sunday" ? 0 : 1;
 }
@@ -646,6 +805,7 @@ function getWeekdayOrder() {
 function flushTick(options = {}) {
   if (trackerTimer.flushTimer(timerState, days, {
     allowWhileSuspended: options.allowWhileSuspended,
+    dayRolloverTime: settings.dayRolloverTime,
     nowMs: options.nowMs,
     source: "timer",
   })) {
@@ -659,6 +819,7 @@ function handleSystemPause() {
   }
 
   trackerTimer.handleSystemPause(timerState, days, {
+    dayRolloverTime: settings.dayRolloverTime,
     source: "timer",
   });
   flushSave();
@@ -711,8 +872,31 @@ function getUiText() {
   return LANGUAGE_PACKS[settings.language] ?? LANGUAGE_PACKS[DEFAULT_LANGUAGE];
 }
 
+function getResolvedTheme() {
+  const theme = trackerCore.sanitizeTheme(settings.theme, DEFAULT_THEME);
+  if (theme === "auto") {
+    return systemThemeMediaQuery?.matches ? "dark" : "light";
+  }
+
+  return theme;
+}
+
+function applyTheme() {
+  document.documentElement.dataset.theme = getResolvedTheme();
+}
+
+function handleSystemThemePreferenceChange() {
+  if (trackerCore.sanitizeTheme(settings.theme, DEFAULT_THEME) !== "auto") {
+    return;
+  }
+
+  applyTheme();
+}
+
 function getLiveWorkMs(date) {
-  return trackerTimer.getLiveWorkMs(timerState, date);
+  return trackerTimer.getLiveWorkMs(timerState, date, {
+    dayRolloverTime: settings.dayRolloverTime,
+  });
 }
 
 function getStoredWorkMsForDate(date) {
@@ -721,6 +905,194 @@ function getStoredWorkMsForDate(date) {
 
 function getWorkMsForDate(date) {
   return getStoredWorkMsForDate(date) + getLiveWorkMs(date);
+}
+
+function getStoredBaseWorkMsForDate(date) {
+  return trackerCore.getDayBaseWorkMs(days, date);
+}
+
+function getStoredManualAdjustmentMsForDate(date) {
+  return trackerCore.getDayManualAdjustmentMs(days, date);
+}
+
+function getDisplayEntriesForDate(date) {
+  return trackerCore.getDisplayEntriesForDay(days, date);
+}
+
+function formatClockTime(timestampMs) {
+  if (!Number.isFinite(timestampMs)) {
+    return "--:--";
+  }
+
+  return new Date(timestampMs).toLocaleTimeString(getUiText().locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatDayRolloverDisplayTime(dayRolloverTime, locale) {
+  const normalizedDayRolloverTime = trackerCore.sanitizeDayRolloverTime(
+    dayRolloverTime,
+    DEFAULT_DAY_ROLLOVER_TIME,
+  );
+  const [hoursText, minutesText] = normalizedDayRolloverTime.split(":");
+  const previewDate = new Date(2000, 0, 1, Number(hoursText), Number(minutesText), 0, 0);
+  const timeFormatter = new Intl.DateTimeFormat(locale, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  if (timeFormatter.resolvedOptions().hour12 === false) {
+    return new Intl.DateTimeFormat(locale, {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(previewDate);
+  }
+
+  return timeFormatter.format(previewDate);
+}
+
+function shiftDayRolloverTime(dayRolloverTime, deltaMinutes) {
+  const normalizedDayRolloverTime = trackerCore.sanitizeDayRolloverTime(
+    dayRolloverTime,
+    DEFAULT_DAY_ROLLOVER_TIME,
+  );
+  const normalizedDeltaMinutes = Math.trunc(Number(deltaMinutes));
+
+  if (!Number.isFinite(normalizedDeltaMinutes) || normalizedDeltaMinutes === 0) {
+    return normalizedDayRolloverTime;
+  }
+
+  const [hoursText, minutesText] = normalizedDayRolloverTime.split(":");
+  const totalMinutes = Number(hoursText) * 60 + Number(minutesText);
+  const nextTotalMinutes = ((totalMinutes + normalizedDeltaMinutes) % 1440 + 1440) % 1440;
+  const nextHours = String(Math.floor(nextTotalMinutes / 60)).padStart(2, "0");
+  const nextMinutes = String(nextTotalMinutes % 60).padStart(2, "0");
+
+  return `${nextHours}:${nextMinutes}`;
+}
+
+function formatSignedWork(totalMs) {
+  if (totalMs === 0) {
+    return formatDetailedWork(0);
+  }
+
+  const prefix = totalMs > 0 ? "+" : "-";
+  return `${prefix}${formatDetailedWork(Math.abs(totalMs))}`;
+}
+
+function getValueTone(totalMs) {
+  if (totalMs > 0) {
+    return "positive";
+  }
+
+  if (totalMs === 0) {
+    return "neutral";
+  }
+
+  return "";
+}
+
+function applyValueTone(element, totalMs) {
+  const tone = getValueTone(totalMs);
+
+  if (tone) {
+    element.dataset.tone = tone;
+    return;
+  }
+
+  delete element.dataset.tone;
+}
+
+function isManualEditBlocked(date = selectedDate) {
+  return timerState.isRunning && getLiveWorkMs(date) > 0;
+}
+
+function createManualEditPreviewDays(date) {
+  const key = dateKey(date);
+  const entries = trackerCore.getDayEntries(days, key);
+
+  if (entries.length === 0) {
+    return {};
+  }
+
+  return {
+    [key]: {
+      entries: entries.map((entry) => ({ ...entry })),
+    },
+  };
+}
+
+function buildManualEditPreview(date, desiredTotalMs) {
+  const key = dateKey(date);
+  const previewDays = createManualEditPreviewDays(date);
+  return trackerCore.setDayManualTotal(previewDays, key, desiredTotalMs, "manual-edit");
+}
+
+function readManualEditNumber(rawValue) {
+  const value = String(rawValue ?? "").trim();
+
+  if (value === "") {
+    return {
+      blank: true,
+      value: 0,
+    };
+  }
+
+  if (!/^\d+$/.test(value)) {
+    return {
+      blank: false,
+      valid: false,
+      value: 0,
+    };
+  }
+
+  return {
+    blank: false,
+    valid: true,
+    value: Number(value),
+  };
+}
+
+function getManualEditFormState() {
+  const ui = getUiText();
+  const hoursState = readManualEditNumber(el.manualEditHours.value);
+  const minutesState = readManualEditNumber(el.manualEditMinutes.value);
+
+  if (hoursState.blank && minutesState.blank) {
+    return {
+      valid: false,
+      error: ui.manualEditInvalidBlank,
+    };
+  }
+
+  if (hoursState.valid === false) {
+    return {
+      valid: false,
+      error: ui.manualEditInvalidHours,
+    };
+  }
+
+  if (minutesState.valid === false || minutesState.value > 59) {
+    return {
+      valid: false,
+      error: ui.manualEditInvalidMinutes,
+    };
+  }
+
+  const desiredTotalMs = ((hoursState.value * 60) + minutesState.value) * 60_000;
+  if (!Number.isFinite(desiredTotalMs)) {
+    return {
+      valid: false,
+      error: ui.manualEditInvalidTotal,
+    };
+  }
+
+  return {
+    valid: true,
+    desiredTotalMs,
+  };
 }
 
 function isRecurringWeekend(date) {
@@ -764,6 +1136,7 @@ function toggleSelectedDateOff() {
 
 function getClearDayState(date = selectedDate) {
   return trackerCore.getClearDayState({
+    dayRolloverTime: settings.dayRolloverTime,
     selectedDate: date,
     todayDate: new Date(),
     isTimerRunning: timerState.isRunning,
@@ -803,7 +1176,7 @@ async function clearSelectedDayWork() {
     return;
   }
 
-  if (timerState.isRunning && getLiveWorkMs(targetDate) > 0 && !isSameDay(targetDate, startOfDay(new Date()))) {
+  if (timerState.isRunning && getLiveWorkMs(targetDate) > 0 && !isSameDay(targetDate, getCurrentBusinessDayDate())) {
     flushTick();
   }
 
@@ -852,6 +1225,7 @@ function formatSelectedDate(date) {
 function calculateCurrentStreak() {
   return trackerCore.calculateCurrentStreak({
     nowDate: new Date(),
+    dayRolloverTime: settings.dayRolloverTime,
     isDayOff,
     getWorkMsForDate,
   });
@@ -890,6 +1264,10 @@ function renderStaticText() {
   el.settingsLanguageLabel.textContent = ui.languageLabel;
   el.settingsLanguageRu.textContent = ui.languageRu;
   el.settingsLanguageEn.textContent = ui.languageEn;
+  el.settingsThemeLabel.textContent = ui.themeLabel;
+  el.settingsThemeLight.textContent = ui.themeLight;
+  el.settingsThemeAuto.textContent = ui.themeAuto;
+  el.settingsThemeDark.textContent = ui.themeDark;
   el.settingsDateFormatLabel.textContent = dateLabels.label;
   el.settingsDateFormatLocalized.textContent = dateLabels.localized;
   el.settingsDateFormatDmy.textContent = dateLabels.dmy;
@@ -897,6 +1275,9 @@ function renderStaticText() {
   el.settingsWeekStartLabel.textContent = ui.weekStartLabel;
   el.settingsWeekStartMonday.textContent = ui.weekStartMonday;
   el.settingsWeekStartSunday.textContent = ui.weekStartSunday;
+  el.settingsDayRolloverLabel.textContent = ui.dayRolloverLabel;
+  el.settingsDayRolloverPrev.setAttribute("aria-label", ui.dayRolloverPrevLabel);
+  el.settingsDayRolloverNext.setAttribute("aria-label", ui.dayRolloverNextLabel);
   el.settingsAutostartLabel.textContent = ui.autostartLabel;
   el.settingsAutostartOff.textContent = ui.disabledLabel;
   el.settingsAutostartOn.textContent = ui.enabledLabel;
@@ -905,8 +1286,281 @@ function renderStaticText() {
   el.settingsAutoBackupOn.textContent = ui.enabledLabel;
   el.settingsDataLabel.textContent = ui.dataLabel;
   el.settingsClearData.textContent = ui.clearDataLabel;
+  el.dayMenuBackdrop.setAttribute("aria-label", ui.dayMenuCloseLabel);
+  el.dayMenuClose.setAttribute("aria-label", ui.dayMenuCloseLabel);
+  el.dayDetailsTitle.textContent = ui.dayDetailsTitle;
+  el.editDayTime.textContent = ui.editDayTime;
+  el.dayDetailsStoredLabel.textContent = ui.dayDetailsStoredLabel;
+  el.dayDetailsBaseLabel.textContent = ui.dayDetailsBaseLabel;
+  el.dayDetailsAdjustmentLabel.textContent = ui.dayDetailsAdjustmentLabel;
+  el.dayDetailsEmpty.textContent = ui.dayDetailsEmpty;
+  el.manualEditTitle.textContent = ui.manualEditTitle;
+  el.manualEditBackdrop.setAttribute("aria-label", ui.manualEditCloseLabel);
+  el.manualEditClose.setAttribute("aria-label", ui.manualEditCloseLabel);
+  el.manualEditCurrentLabel.textContent = ui.manualEditCurrentLabel;
+  el.manualEditBaseLabel.textContent = ui.manualEditBaseLabel;
+  el.manualEditAdjustmentLabel.textContent = ui.manualEditAdjustmentLabel;
+  el.manualEditHoursLabel.textContent = ui.manualEditHoursLabel;
+  el.manualEditMinutesLabel.textContent = ui.manualEditMinutesLabel;
+  el.manualEditCancel.textContent = ui.cancelLabel;
+  el.manualEditSave.textContent = ui.manualEditSave;
   el.importBackup.textContent = ui.importBackup;
   el.exportBackup.textContent = ui.exportBackup;
+}
+
+function createDayEntryElement(entry) {
+  const ui = getUiText();
+  const item = document.createElement("article");
+  item.className = "day-entry";
+
+  const header = document.createElement("div");
+  header.className = "day-entry-header";
+
+  const kind = document.createElement("span");
+  kind.className = "day-entry-kind";
+
+  const title = document.createElement("p");
+  title.className = "day-entry-title";
+
+  const value = document.createElement("span");
+  value.className = "day-entry-value";
+
+  const note = document.createElement("p");
+  note.className = "day-entry-note";
+
+  if (entry.type === "interval") {
+    item.classList.add("day-entry--interval");
+    kind.textContent = ui.dayEntryIntervalKind;
+    title.textContent = `${formatClockTime(entry.startMs)} - ${formatClockTime(entry.endMs)}`;
+    value.textContent = formatDetailedWork(entry.durationMs);
+    note.textContent = ui.dayEntryIntervalNote;
+    applyValueTone(value, entry.durationMs);
+  } else if (entry.type === "legacy-total") {
+    item.classList.add("day-entry--legacy");
+    kind.textContent = ui.dayEntryLegacyKind;
+    title.textContent = ui.dayEntryLegacyTitle;
+    value.textContent = formatDetailedWork(entry.durationMs);
+    note.textContent = ui.dayEntryLegacyNote;
+    applyValueTone(value, entry.durationMs);
+  } else {
+    item.classList.add("day-entry--manual");
+    kind.textContent = ui.dayEntryManualKind;
+    title.textContent = ui.dayEntryManualTitle;
+    value.textContent = formatSignedWork(entry.deltaMs);
+    note.textContent = ui.dayEntryManualNote;
+    applyValueTone(value, entry.deltaMs);
+  }
+
+  header.append(kind, title, value);
+  item.append(header, note);
+  return item;
+}
+
+function renderManualEditOverlay() {
+  if (!manualEditState) {
+    el.manualEditOverlay.hidden = true;
+    el.manualEditError.hidden = true;
+    el.manualEditError.textContent = "";
+    el.manualEditSave.disabled = false;
+    el.manualEditSave.title = "";
+    return;
+  }
+
+  const ui = getUiText();
+  const targetDate = manualEditState.date;
+  const storedTotalMs = getStoredWorkMsForDate(targetDate);
+  const baseTotalMs = getStoredBaseWorkMsForDate(targetDate);
+  const currentAdjustmentMs = getStoredManualAdjustmentMsForDate(targetDate);
+
+  el.manualEditCurrentValue.textContent = formatDetailedWork(storedTotalMs);
+  el.manualEditBaseValue.textContent = formatDetailedWork(baseTotalMs);
+  applyValueTone(el.manualEditCurrentValue, storedTotalMs);
+  applyValueTone(el.manualEditBaseValue, baseTotalMs);
+
+  let nextAdjustmentMs = currentAdjustmentMs;
+  let errorMessage = "";
+  let canSave = true;
+
+  if (isManualEditBlocked(targetDate)) {
+    errorMessage = ui.manualEditBlockedRunning;
+    canSave = false;
+  } else {
+    const formState = getManualEditFormState();
+    if (!formState.valid) {
+      errorMessage = formState.error;
+      canSave = false;
+    } else {
+      nextAdjustmentMs = buildManualEditPreview(targetDate, formState.desiredTotalMs).manualAdjustmentMs;
+    }
+  }
+
+  el.manualEditAdjustmentValue.textContent = formatSignedWork(nextAdjustmentMs);
+  applyValueTone(el.manualEditAdjustmentValue, nextAdjustmentMs);
+  el.manualEditError.hidden = errorMessage === "";
+  el.manualEditError.textContent = errorMessage;
+  el.manualEditSave.disabled = !canSave;
+  el.manualEditSave.title = canSave ? "" : errorMessage;
+}
+
+function renderDayMenuButtonState() {
+  const ui = getUiText();
+  const isOpen = !el.dayMenuOverlay.hidden;
+
+  el.dayMenuButton.setAttribute("aria-expanded", String(isOpen));
+  el.dayMenuButton.setAttribute("aria-label", isOpen ? ui.dayMenuCloseLabel : ui.dayMenuLabel);
+}
+
+function closeDayMenuOverlay(options = {}) {
+  if (el.dayMenuOverlay.hidden) {
+    return;
+  }
+
+  const returnFocusTarget = options.returnFocusTarget ?? dayMenuReturnFocus ?? el.dayMenuButton;
+  dayMenuReturnFocus = null;
+  el.dayMenuOverlay.hidden = true;
+  renderDayMenuButtonState();
+
+  if (
+    options.returnFocus !== false &&
+    returnFocusTarget &&
+    typeof returnFocusTarget.focus === "function" &&
+    !returnFocusTarget.disabled
+  ) {
+    returnFocusTarget.focus();
+  }
+}
+
+function openDayMenuOverlay() {
+  if (!el.dayMenuOverlay.hidden) {
+    return;
+  }
+
+  dayMenuReturnFocus = document.activeElement;
+  el.dayMenuOverlay.hidden = false;
+  renderDayDetailsPanel();
+  renderDayMenuButtonState();
+
+  const nextFocusTarget = el.editDayTime.disabled ? el.dayMenuClose : el.editDayTime;
+  nextFocusTarget.focus();
+}
+
+function toggleDayMenuOverlay() {
+  if (el.dayMenuOverlay.hidden) {
+    openDayMenuOverlay();
+    return;
+  }
+
+  closeDayMenuOverlay();
+}
+
+function closeManualEditOverlay(options = {}) {
+  if (el.manualEditOverlay.hidden && !manualEditState) {
+    return;
+  }
+
+  const returnFocusTarget = manualEditState?.returnFocusTarget ?? el.dayMenuButton;
+  manualEditState = null;
+  el.manualEditOverlay.hidden = true;
+  renderManualEditOverlay();
+
+  if (
+    options.returnFocus !== false &&
+    returnFocusTarget &&
+    typeof returnFocusTarget.focus === "function" &&
+    !returnFocusTarget.disabled
+  ) {
+    returnFocusTarget.focus();
+  }
+}
+
+function openManualEditOverlay(date = selectedDate, options = {}) {
+  const ui = getUiText();
+  const targetDate = startOfDay(date);
+
+  if (isManualEditBlocked(targetDate)) {
+    showAppToast(ui.manualEditBlockedRunning, "warning");
+    renderDayDetailsPanel();
+    return;
+  }
+
+  const storedMinutes = Math.floor(Math.max(0, getStoredWorkMsForDate(targetDate)) / 60_000);
+  closeDayMenuOverlay({ returnFocus: false });
+  manualEditState = {
+    date: targetDate,
+    returnFocusTarget: options.returnFocusTarget ?? el.dayMenuButton,
+  };
+  el.manualEditHours.value = String(Math.floor(storedMinutes / 60));
+  el.manualEditMinutes.value = String(storedMinutes % 60);
+  el.manualEditOverlay.hidden = false;
+  renderManualEditOverlay();
+  el.manualEditHours.focus();
+  el.manualEditHours.select();
+}
+
+function submitManualEdit(event) {
+  event.preventDefault();
+
+  if (!manualEditState) {
+    return;
+  }
+
+  const ui = getUiText();
+  const targetDate = manualEditState.date;
+
+  if (isManualEditBlocked(targetDate)) {
+    renderManualEditOverlay();
+    showAppToast(ui.manualEditBlockedRunning, "warning");
+    return;
+  }
+
+  const formState = getManualEditFormState();
+  if (!formState.valid) {
+    renderManualEditOverlay();
+    return;
+  }
+
+  const result = trackerCore.setDayManualTotal(days, dateKey(targetDate), formState.desiredTotalMs, "manual-edit");
+  if (result.changed) {
+    flushSave();
+  }
+
+  closeManualEditOverlay();
+  renderCore();
+
+  if (result.changed) {
+    showAppToast(ui.manualEditSaved, "success");
+  }
+}
+
+function renderDayDetailsPanel() {
+  const ui = getUiText();
+  const storedTotalMs = getStoredWorkMsForDate(selectedDate);
+  const baseTotalMs = getStoredBaseWorkMsForDate(selectedDate);
+  const manualAdjustmentMs = getStoredManualAdjustmentMsForDate(selectedDate);
+  const liveMs = getLiveWorkMs(selectedDate);
+  const displayEntries = getDisplayEntriesForDate(selectedDate);
+  const blockedMessage = isManualEditBlocked(selectedDate) ? ui.manualEditBlockedRunning : "";
+
+  el.dayMenuCaption.textContent = formatSelectedDate(selectedDate);
+  el.dayDetailsStoredValue.textContent = formatDetailedWork(storedTotalMs);
+  el.dayDetailsBaseValue.textContent = formatDetailedWork(baseTotalMs);
+  el.dayDetailsAdjustmentValue.textContent = formatSignedWork(manualAdjustmentMs);
+  applyValueTone(el.dayDetailsStoredValue, storedTotalMs);
+  applyValueTone(el.dayDetailsBaseValue, baseTotalMs);
+  applyValueTone(el.dayDetailsAdjustmentValue, manualAdjustmentMs);
+
+  el.dayDetailsLive.hidden = liveMs <= 0;
+  el.dayDetailsLive.textContent = `${ui.dayDetailsLiveLabel}: ${formatDetailedWork(liveMs)}`;
+  el.dayDetailsEmpty.hidden = displayEntries.length > 0;
+  el.dayDetailsList.innerHTML = "";
+
+  for (const entry of displayEntries) {
+    el.dayDetailsList.appendChild(createDayEntryElement(entry));
+  }
+
+  el.editDayTime.disabled = Boolean(blockedMessage);
+  el.editDayTime.setAttribute("aria-label", ui.editDayTime);
+  el.editDayTime.title = blockedMessage;
 }
 
 function renderStatus() {
@@ -941,9 +1595,10 @@ function updateDailyTargetHours(rawValue) {
 }
 
 function renderTimer() {
-  const todayMs = getWorkMsForDate(new Date());
+  const todayMs = getWorkMsForDate(getCurrentBusinessDayDate());
   el.timerDisplay.textContent = formatDuration(todayMs);
   el.timerPanel.setAttribute("aria-pressed", String(timerState.isRunning));
+  el.timerPanel.classList.toggle("running", timerState.isRunning);
 }
 
 function renderWeekendSettings() {
@@ -986,6 +1641,13 @@ function renderWeekendSettings() {
 function renderSettingsPanel() {
   const ui = getUiText();
   const isEnglish = settings.language === "en";
+  const theme = trackerCore.sanitizeTheme(settings.theme, DEFAULT_THEME);
+  el.settingsThemeLight.classList.toggle("active", theme === "light");
+  el.settingsThemeAuto.classList.toggle("active", theme === "auto");
+  el.settingsThemeDark.classList.toggle("active", theme === "dark");
+  el.settingsThemeLight.setAttribute("aria-pressed", String(theme === "light"));
+  el.settingsThemeAuto.setAttribute("aria-pressed", String(theme === "auto"));
+  el.settingsThemeDark.setAttribute("aria-pressed", String(theme === "dark"));
   el.settingsLanguageRu.classList.toggle("active", !isEnglish);
   el.settingsLanguageEn.classList.toggle("active", isEnglish);
   el.settingsLanguageRu.setAttribute("aria-pressed", String(!isEnglish));
@@ -1006,6 +1668,10 @@ function renderSettingsPanel() {
   el.settingsWeekStartSunday.classList.toggle("active", weekStart === "sunday");
   el.settingsWeekStartMonday.setAttribute("aria-pressed", String(weekStart === "monday"));
   el.settingsWeekStartSunday.setAttribute("aria-pressed", String(weekStart === "sunday"));
+  el.settingsDayRolloverValue.textContent = formatDayRolloverDisplayTime(
+    settings.dayRolloverTime,
+    ui.locale,
+  );
 
   const autostart = settings.autostart === true;
   el.settingsAutostartOff.classList.toggle("active", !autostart);
@@ -1063,11 +1729,11 @@ function armClearData() {
 }
 
 function openSettingsPanel() {
-
   if (!el.settingsOverlay.hidden) {
     return;
   }
 
+  closeDayMenuOverlay({ returnFocus: false });
   el.settingsOverlay.hidden = false;
   renderSettingsPanel();
   el.settingsLanguageRu.focus();
@@ -1090,6 +1756,22 @@ function toggleSettingsPanel() {
   }
 
   closeSettingsPanel();
+}
+
+function setTheme(theme) {
+  const nextTheme = trackerCore.sanitizeTheme(theme, DEFAULT_THEME);
+
+  if (settings.theme === nextTheme) {
+    applyTheme();
+    renderSettingsPanel();
+    return;
+  }
+
+  settings.theme = nextTheme;
+  applyTheme();
+  scheduleSave();
+  renderSettingsPanel();
+  syncSettingsState();
 }
 
 function setLanguage(language) {
@@ -1132,6 +1814,31 @@ function setWeekStart(weekStart) {
   scheduleSave();
   renderAll();
   syncSettingsState();
+}
+
+function setDayRolloverTime(dayRolloverTime) {
+  const nextDayRolloverTime = trackerCore.sanitizeDayRolloverTime(
+    dayRolloverTime,
+    settings.dayRolloverTime ?? DEFAULT_DAY_ROLLOVER_TIME,
+  );
+
+  if (settings.dayRolloverTime === nextDayRolloverTime) {
+    renderSettingsPanel();
+    return;
+  }
+
+  if (timerState.isRunning && !timerState.isSuspended) {
+    flushTick();
+  }
+
+  settings.dayRolloverTime = nextDayRolloverTime;
+  scheduleSave();
+  renderAll();
+  syncSettingsState();
+}
+
+function adjustDayRolloverTime(deltaMinutes) {
+  setDayRolloverTime(shiftDayRolloverTime(settings.dayRolloverTime, deltaMinutes));
 }
 
 async function setAutostart(enabled) {
@@ -1226,8 +1933,10 @@ async function clearStoredData() {
       throw new Error("Clear data did not complete successfully.");
     }
     removePersistedStateKeys();
-    calendarCursor = startOfMonth(new Date());
-    selectedDate = startOfDay(new Date());
+    const currentDay = getCurrentBusinessDayDate();
+    calendarCursor = startOfMonth(currentDay);
+    selectedDate = currentDay;
+    selectedDateFollowsCurrentDay = true;
     lastAutoBackupDateKey = null;
     resetClearDataArming();
     applyPersistedState(createDefaultPersistedState(), clearResult.bootstrap ?? {
@@ -1256,7 +1965,9 @@ async function clearStoredData() {
 function syncSettingsState() {
   window.desktopAPI?.sendSettingsState?.({
     language: settings.language,
+    theme: settings.theme,
     weekStart: settings.weekStart,
+    dayRolloverTime: settings.dayRolloverTime,
     autoBackup: settings.autoBackup,
   });
 }
@@ -1281,8 +1992,8 @@ function buildCalendarCell(date) {
   cell.append(fill, dateLabel, hours);
   cell.addEventListener("click", () => {
     selectedDate = startOfDay(date);
-    refreshVisibleCalendar();
-    renderSelectedDayPanel();
+    selectedDateFollowsCurrentDay = isSameDay(selectedDate, getCurrentBusinessDayDate());
+    renderCore();
   });
 
   calendarCellRefs.set(key, { cell, fill, hours, date });
@@ -1324,7 +2035,7 @@ function rebuildCalendar() {
 
 function updateCalendarCell(refs) {
 
-  const today = startOfDay(new Date());
+  const today = getCurrentBusinessDayDate();
   const workMs = getWorkMsForDate(refs.date);
   const workHours = workMs / 3_600_000;
   const progress = Math.min(100, (workHours / settings.dailyTargetHours) * 100);
@@ -1377,22 +2088,31 @@ function renderSelectedDayPanel() {
   el.clearDay.disabled = clearState.reason === "no-work";
   el.clearDay.setAttribute("aria-label", ui.clearDayLabel);
   el.clearDay.title = clearState.reason === "running-today" ? ui.clearDayBlockedRunning : "";
+  renderDayMenuButtonState();
 }
 
 function renderCore() {
+  const shouldRebuildCalendar = syncCurrentDaySelection();
+  if (shouldRebuildCalendar) {
+    rebuildCalendar();
+  }
 
   renderStatus();
   renderStats();
   renderTimer();
   refreshVisibleCalendar();
   renderSelectedDayPanel();
+  renderDayDetailsPanel();
+  renderManualEditOverlay();
 }
 
 function renderAll() {
+  applyTheme();
   renderStaticText();
   renderSettingsPanel();
   renderWeekendSettings();
   renderDailyTarget();
+  syncCurrentDaySelection();
   rebuildCalendar();
   renderCore();
 }
@@ -1400,10 +2120,11 @@ function renderAll() {
 function toggleRun() {
   if (timerState.isRunning) {
     trackerTimer.stopTimer(timerState, days, {
+      dayRolloverTime: settings.dayRolloverTime,
       source: "timer",
     });
   } else {
-    const today = startOfDay(new Date());
+    const today = getCurrentBusinessDayDate();
 
     if (trackerCore.shouldForceWorkOverrideOnTimerStart({
       isTimerRunning: timerState.isRunning,
@@ -1434,6 +2155,18 @@ el.toggleDayOff.addEventListener("click", toggleSelectedDateOff);
 el.clearDay.addEventListener("click", () => {
   void clearSelectedDayWork();
 });
+el.dayMenuButton.addEventListener("click", toggleDayMenuOverlay);
+el.dayMenuBackdrop.addEventListener("click", () => closeDayMenuOverlay());
+el.dayMenuClose.addEventListener("click", () => closeDayMenuOverlay());
+el.editDayTime.addEventListener("click", () => {
+  openManualEditOverlay(selectedDate, { returnFocusTarget: el.dayMenuButton });
+});
+el.manualEditBackdrop.addEventListener("click", () => closeManualEditOverlay());
+el.manualEditClose.addEventListener("click", () => closeManualEditOverlay());
+el.manualEditCancel.addEventListener("click", () => closeManualEditOverlay());
+el.manualEditForm.addEventListener("submit", submitManualEdit);
+el.manualEditHours.addEventListener("input", renderManualEditOverlay);
+el.manualEditMinutes.addEventListener("input", renderManualEditOverlay);
 el.dailyTargetHours.addEventListener("change", () => {
   updateDailyTargetHours(el.dailyTargetHours.value);
 });
@@ -1443,11 +2176,16 @@ el.settingsClose.addEventListener("click", closeSettingsPanel);
 el.settingsBackdrop.addEventListener("click", closeSettingsPanel);
 el.settingsLanguageRu.addEventListener("click", () => setLanguage("ru"));
 el.settingsLanguageEn.addEventListener("click", () => setLanguage("en"));
+el.settingsThemeLight.addEventListener("click", () => setTheme("light"));
+el.settingsThemeAuto.addEventListener("click", () => setTheme("auto"));
+el.settingsThemeDark.addEventListener("click", () => setTheme("dark"));
 el.settingsDateFormatLocalized.addEventListener("click", () => setDateFormat("localized"));
 el.settingsDateFormatDmy.addEventListener("click", () => setDateFormat("dmy"));
 el.settingsDateFormatMdy.addEventListener("click", () => setDateFormat("mdy"));
 el.settingsWeekStartMonday.addEventListener("click", () => setWeekStart("monday"));
 el.settingsWeekStartSunday.addEventListener("click", () => setWeekStart("sunday"));
+el.settingsDayRolloverPrev.addEventListener("click", () => adjustDayRolloverTime(-DAY_ROLLOVER_STEP_MINUTES));
+el.settingsDayRolloverNext.addEventListener("click", () => adjustDayRolloverTime(DAY_ROLLOVER_STEP_MINUTES));
 el.settingsAutostartOff.addEventListener("click", () => {
   void setAutostart(false);
 });
@@ -1478,27 +2216,39 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
+  if (!el.manualEditOverlay.hidden) {
+    closeManualEditOverlay();
+    return;
+  }
+
+  if (!el.dayMenuOverlay.hidden) {
+    closeDayMenuOverlay();
+    return;
+  }
+
   if (!el.settingsOverlay.hidden) {
     closeSettingsPanel();
   }
 });
 
 el.prevMonth.addEventListener("click", () => {
+  selectedDateFollowsCurrentDay = false;
   calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() - 1, 1);
   if (!isSameMonth(selectedDate, calendarCursor)) {
     selectedDate = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth(), 1);
   }
   rebuildCalendar();
-  renderSelectedDayPanel();
+  renderCore();
 });
 
 el.nextMonth.addEventListener("click", () => {
+  selectedDateFollowsCurrentDay = false;
   calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() + 1, 1);
   if (!isSameMonth(selectedDate, calendarCursor)) {
     selectedDate = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth(), 1);
   }
   rebuildCalendar();
-  renderSelectedDayPanel();
+  renderCore();
 });
 
 el.minimizeWindow.addEventListener("click", () => {
@@ -1584,7 +2334,23 @@ window.desktopAPI?.onSystemState?.((state) => {
   }
 });
 
+if (systemThemeMediaQuery) {
+  if (typeof systemThemeMediaQuery.addEventListener === "function") {
+    systemThemeMediaQuery.addEventListener("change", handleSystemThemePreferenceChange);
+  } else if (typeof systemThemeMediaQuery.addListener === "function") {
+    systemThemeMediaQuery.addListener(handleSystemThemePreferenceChange);
+  }
+}
+
 window.addEventListener("beforeunload", () => {
+  if (systemThemeMediaQuery) {
+    if (typeof systemThemeMediaQuery.removeEventListener === "function") {
+      systemThemeMediaQuery.removeEventListener("change", handleSystemThemePreferenceChange);
+    } else if (typeof systemThemeMediaQuery.removeListener === "function") {
+      systemThemeMediaQuery.removeListener(handleSystemThemePreferenceChange);
+    }
+  }
+
   flushTick();
   flushSave();
 });

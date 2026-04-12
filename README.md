@@ -14,7 +14,7 @@ It is built to keep progress visible rather than hidden. When hours, the calenda
 - tray integration
 - automatic backups
 - clear saved data from settings
-- language, week start, and date format settings
+- language, week start, date format, and day rollover settings
 
 ## Run
 

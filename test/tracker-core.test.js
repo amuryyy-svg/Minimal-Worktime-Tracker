@@ -1,4 +1,4 @@
-﻿const assert = require("node:assert/strict");
+const assert = require("node:assert/strict");
 const loginItemState = require("../src/login-item-state.js");
 const trackerCore = require("../src/renderer/tracker-core.js");
 const trackerStorage = require("../src/renderer/tracker-storage.js");
@@ -32,8 +32,8 @@ function getDayWorkMs(days, date) {
   const changed = trackerCore.addElapsedTimeToLogs(logs, start, end);
 
   assert.equal(changed, true);
-  assert.equal(logs[trackerCore.dateKey(new Date(2026, 0, 15))].workMs, 30 * 60 * 1000);
-  assert.equal(logs[trackerCore.dateKey(new Date(2026, 0, 16))].workMs, 30 * 60 * 1000);
+  assert.equal(logs[trackerCore.dateKey(new Date(2026, 0, 15))].workMs, 60 * 60 * 1000);
+  assert.equal(logs[trackerCore.dateKey(new Date(2026, 0, 16))], undefined);
 }
 
 {
@@ -63,6 +63,8 @@ function getDayWorkMs(days, date) {
       language: "en",
       dateFormat: "mdy",
       weekStart: "sunday",
+      dayRolloverTime: "05:45",
+      theme: "dark",
       autostart: 1,
       autoBackup: "false",
     },
@@ -86,9 +88,16 @@ function getDayWorkMs(days, date) {
   assert.equal(persisted.settings.language, "en");
   assert.equal(persisted.settings.dateFormat, "mdy");
   assert.equal(persisted.settings.weekStart, "sunday");
+  assert.equal(persisted.settings.dayRolloverTime, "05:45");
+  assert.equal(persisted.settings.theme, "dark");
   assert.equal(persisted.settings.autostart, true);
   assert.equal(persisted.settings.autoBackup, false);
   assert.equal(persisted.timerState.isRunning, true);
+}
+
+{
+  assert.equal(trackerCore.getBusinessDayKeyFromInstant(new Date(2026, 0, 15, 0, 40)), "2026-01-14");
+  assert.equal(trackerCore.getBusinessDayKeyFromInstant(new Date(2026, 0, 15, 6, 0)), "2026-01-15");
 }
 
 {
@@ -143,6 +152,7 @@ function getDayWorkMs(days, date) {
   const loaded = trackerStorage.loadPersistedState(fakeStorage);
 
   assert.equal(trackerCore.getDayWorkMs(loaded.days, "2026-01-08"), 30 * 60 * 1000);
+  assert.equal(loaded.settings.dayRolloverTime, "06:00");
 }
 
 {
@@ -200,20 +210,20 @@ function getDayWorkMs(days, date) {
 
 {
   const days = {};
-  const start = new Date(2026, 0, 15, 23, 30).getTime();
-  const end = new Date(2026, 0, 16, 0, 30).getTime();
+  const start = new Date(2026, 0, 15, 5, 30).getTime();
+  const end = new Date(2026, 0, 15, 6, 30).getTime();
 
   const changed = trackerCore.addIntervalToDays(days, start, end, "timer");
 
   assert.equal(changed, true);
+  assert.equal(trackerCore.getDayWorkMs(days, "2026-01-14"), 30 * 60 * 1000);
   assert.equal(trackerCore.getDayWorkMs(days, "2026-01-15"), 30 * 60 * 1000);
-  assert.equal(trackerCore.getDayWorkMs(days, "2026-01-16"), 30 * 60 * 1000);
   assert.equal(
-    trackerCore.getDayEntries(days, "2026-01-15")[0].endMs - trackerCore.getDayEntries(days, "2026-01-15")[0].startMs,
+    trackerCore.getDayEntries(days, "2026-01-14")[0].endMs - trackerCore.getDayEntries(days, "2026-01-14")[0].startMs,
     30 * 60 * 1000,
   );
   assert.equal(
-    trackerCore.getDayEntries(days, "2026-01-16")[0].endMs - trackerCore.getDayEntries(days, "2026-01-16")[0].startMs,
+    trackerCore.getDayEntries(days, "2026-01-15")[0].endMs - trackerCore.getDayEntries(days, "2026-01-15")[0].startMs,
     30 * 60 * 1000,
   );
 }
@@ -294,11 +304,12 @@ function getDayWorkMs(days, date) {
 }
 
 {
-  const selectedDate = new Date(2026, 3, 10);
+  const selectedDate = new Date(2026, 3, 9);
 
   assert.deepEqual(trackerCore.getClearDayState({
     selectedDate,
-    todayDate: selectedDate,
+    todayDate: new Date(2026, 3, 10, 0, 40),
+    dayRolloverTime: "06:00",
     isTimerRunning: true,
     storedWorkMs: 90_000,
   }), {
@@ -308,7 +319,7 @@ function getDayWorkMs(days, date) {
 
   assert.deepEqual(trackerCore.getClearDayState({
     selectedDate,
-    todayDate: new Date(2026, 3, 11),
+    todayDate: new Date(2026, 3, 11, 7, 0),
     isTimerRunning: false,
     storedWorkMs: 0,
   }), {
@@ -318,7 +329,7 @@ function getDayWorkMs(days, date) {
 
   assert.deepEqual(trackerCore.getClearDayState({
     selectedDate,
-    todayDate: new Date(2026, 3, 11),
+    todayDate: new Date(2026, 3, 11, 7, 0),
     isTimerRunning: false,
     storedWorkMs: 90_000,
   }), {
@@ -358,7 +369,7 @@ function getDayWorkMs(days, date) {
   });
 
   const streak = trackerCore.calculateCurrentStreak({
-    nowDate: new Date(2026, 3, 16),
+    nowDate: new Date(2026, 3, 16, 7, 0),
     isDayOff: createIsDayOffResolver(migrated.settings),
     getWorkMsForDate: (date) => getDayWorkMs(migrated.days, date),
   });
@@ -381,7 +392,7 @@ function getDayWorkMs(days, date) {
   });
 
   const streak = trackerCore.calculateCurrentStreak({
-    nowDate: new Date(2026, 3, 13),
+    nowDate: new Date(2026, 3, 13, 7, 0),
     isDayOff: createIsDayOffResolver(migrated.settings),
     getWorkMsForDate: (date) => getDayWorkMs(migrated.days, date),
   });
@@ -406,11 +417,47 @@ function getDayWorkMs(days, date) {
   assert.equal(trackerCore.sanitizeDateFormat("bad"), "localized");
   assert.equal(trackerCore.sanitizeWeekStart("sunday"), "sunday");
   assert.equal(trackerCore.sanitizeWeekStart("bad"), "monday");
+  assert.equal(trackerCore.sanitizeDayRolloverTime("06:15"), "06:15");
+  assert.equal(trackerCore.sanitizeDayRolloverTime("bad"), "06:00");
+  assert.equal(trackerCore.sanitizeDayRolloverTime("bad", "05:30"), "05:30");
+  assert.equal(trackerCore.sanitizeTheme("dark"), "dark");
+  assert.equal(trackerCore.sanitizeTheme("auto"), "auto");
+  assert.equal(trackerCore.sanitizeTheme("bad"), "light");
   assert.equal(trackerCore.sanitizeBoolean(true), true);
   assert.equal(trackerCore.sanitizeBoolean(undefined, true), true);
   assert.equal(trackerCore.sanitizeBoolean("bad"), false);
 }
 
+{
+  const persisted = trackerCore.createPersistedState({
+    settings: {
+      language: "en",
+    },
+  });
+
+  assert.equal(persisted.settings.theme, "light");
+  assert.equal(persisted.settings.dayRolloverTime, "06:00");
+}
+
+{
+  const normalized = trackerCore.sanitizeSettings({
+    theme: "bad",
+  }, {
+    theme: "dark",
+  });
+
+  assert.equal(normalized.theme, "dark");
+}
+
+{
+  const normalized = trackerCore.sanitizeSettings({
+    theme: "auto",
+  }, {
+    theme: "light",
+  });
+
+  assert.equal(normalized.theme, "auto");
+}
 {
   const backup = trackerCore.createBackupPayload({
     logs: {
@@ -442,6 +489,7 @@ function getDayWorkMs(days, date) {
       settings: {
         language: "ru",
         weekStart: "monday",
+        dayRolloverTime: "07:15",
         autostart: false,
         autoBackup: true,
       },
@@ -458,6 +506,7 @@ function getDayWorkMs(days, date) {
   assert.equal(trackerCore.getDayWorkMs(runtimeState.days, "2026-01-05"), 240_000);
   assert.equal(runtimeState.settings.autostart, true);
   assert.equal(runtimeState.settings.autoBackup, true);
+  assert.equal(runtimeState.settings.dayRolloverTime, "07:15");
   assert.equal(runtimeState.timerState.isRunning, false);
 }
 
@@ -534,8 +583,8 @@ function getDayWorkMs(days, date) {
   const changed = trackerTimer.flushTimer(runtime, days, { nowMs: endMs, source: "timer" });
 
   assert.equal(changed, true);
-  assert.equal(trackerCore.getDayWorkMs(days, "2026-01-20"), 30 * 60 * 1000);
-  assert.equal(trackerCore.getDayWorkMs(days, "2026-01-21"), 30 * 60 * 1000);
+  assert.equal(trackerCore.getDayWorkMs(days, "2026-01-20"), 60 * 60 * 1000);
+  assert.equal(trackerCore.getDayWorkMs(days, "2026-01-21"), 0);
 }
 
 {
@@ -597,3 +646,263 @@ function getDayWorkMs(days, date) {
   assert.equal(trackerCore.getDayWorkMs(days, "2026-01-22"), 35 * 60 * 1000);
 }
 
+
+
+{
+  const days = {};
+  trackerCore.addIntervalToDays(
+    days,
+    new Date(2026, 1, 1, 9, 0).getTime(),
+    new Date(2026, 1, 1, 9, 45).getTime(),
+    "timer",
+  );
+
+  assert.equal(trackerCore.getDayBaseWorkMs(days, "2026-02-01"), 45 * 60 * 1000);
+  assert.equal(trackerCore.getDayManualAdjustmentMs(days, "2026-02-01"), 0);
+  assert.equal(trackerCore.getDayEffectiveWorkMs(days, "2026-02-01"), 45 * 60 * 1000);
+}
+
+{
+  const persisted = trackerCore.createPersistedState({
+    days: {
+      "2026-02-02": {
+        entries: [
+          {
+            type: "legacy-total",
+            durationMs: 60 * 60 * 1000,
+            source: "import",
+          },
+          {
+            type: "manual-adjustment",
+            deltaMs: -15 * 60 * 1000,
+            source: "manual-edit",
+          },
+        ],
+      },
+    },
+  });
+
+  assert.equal(trackerCore.getDayBaseWorkMs(persisted.days, "2026-02-02"), 60 * 60 * 1000);
+  assert.equal(trackerCore.getDayManualAdjustmentMs(persisted.days, "2026-02-02"), -15 * 60 * 1000);
+  assert.equal(trackerCore.getDayEffectiveWorkMs(persisted.days, "2026-02-02"), 45 * 60 * 1000);
+}
+
+{
+  const days = trackerCore.createPersistedState({
+    days: {
+      "2026-02-03": {
+        entries: [{
+          type: "interval",
+          startMs: new Date(2026, 1, 3, 9, 0).getTime(),
+          endMs: new Date(2026, 1, 3, 9, 30).getTime(),
+          source: "timer",
+        }],
+      },
+    },
+  }).days;
+
+  const result = trackerCore.setDayManualTotal(days, "2026-02-03", 45 * 60 * 1000);
+
+  assert.equal(result.baseTotalMs, 30 * 60 * 1000);
+  assert.equal(result.manualAdjustmentMs, 15 * 60 * 1000);
+  assert.equal(trackerCore.getDayManualAdjustmentMs(days, "2026-02-03"), 15 * 60 * 1000);
+  assert.equal(
+    trackerCore.getDayEntries(days, "2026-02-03").filter((entry) => entry.type === "manual-adjustment").length,
+    1,
+  );
+}
+
+{
+  const days = trackerCore.createPersistedState({
+    days: {
+      "2026-02-04": {
+        entries: [
+          {
+            type: "legacy-total",
+            durationMs: 40 * 60 * 1000,
+            source: "import",
+          },
+          {
+            type: "manual-adjustment",
+            deltaMs: 20 * 60 * 1000,
+            source: "manual-edit",
+          },
+        ],
+      },
+    },
+  }).days;
+
+  const result = trackerCore.setDayManualTotal(days, "2026-02-04", 40 * 60 * 1000);
+
+  assert.equal(result.manualAdjustmentMs, 0);
+  assert.equal(trackerCore.getDayManualAdjustmentMs(days, "2026-02-04"), 0);
+  assert.equal(
+    trackerCore.getDayEntries(days, "2026-02-04").filter((entry) => entry.type === "manual-adjustment").length,
+    0,
+  );
+}
+
+{
+  const days = trackerCore.createPersistedState({
+    days: {
+      "2026-02-05": {
+        entries: [{
+          type: "legacy-total",
+          durationMs: 60 * 60 * 1000,
+          source: "import",
+        }],
+      },
+    },
+  }).days;
+
+  trackerCore.setDayManualTotal(days, "2026-02-05", 90 * 60 * 1000);
+  trackerCore.setDayManualTotal(days, "2026-02-05", 75 * 60 * 1000);
+
+  assert.equal(trackerCore.getDayManualAdjustmentMs(days, "2026-02-05"), 15 * 60 * 1000);
+  assert.equal(
+    trackerCore.getDayEntries(days, "2026-02-05").filter((entry) => entry.type === "manual-adjustment").length,
+    1,
+  );
+}
+
+{
+  const days = trackerCore.createPersistedState({
+    days: {
+      "2026-02-06": {
+        entries: [{
+          type: "interval",
+          startMs: new Date(2026, 1, 6, 9, 0).getTime(),
+          endMs: new Date(2026, 1, 6, 9, 30).getTime(),
+          source: "timer",
+        }],
+      },
+    },
+  }).days;
+
+  assert.throws(() => {
+    trackerCore.setDayManualTotal(days, "2026-02-06", -1);
+  }, /negative totals/);
+  assert.equal(trackerCore.getDayManualAdjustmentMs(days, "2026-02-06"), 0);
+}
+
+{
+  const days = trackerCore.createPersistedState({
+    days: {
+      "2026-02-07": {
+        entries: [{
+          type: "manual-adjustment",
+          deltaMs: 30 * 60 * 1000,
+          source: "manual-edit",
+        }],
+      },
+      "2026-02-06": {
+        entries: [{
+          type: "legacy-total",
+          durationMs: 45 * 60 * 1000,
+          source: "import",
+        }],
+      },
+    },
+    settings: {
+      weekendDays: [],
+    },
+  }).days;
+
+  const streak = trackerCore.calculateCurrentStreak({
+    nowDate: new Date(2026, 1, 7, 7, 0),
+    isDayOff: createIsDayOffResolver({ weekendDays: [], dayOverrides: {} }),
+    getWorkMsForDate: (date) => trackerCore.getDayWorkMs(days, date),
+  });
+
+  assert.equal(streak, 2);
+}
+
+{
+  const days = trackerCore.createPersistedState({
+    days: {
+      "2026-02-08": {
+        entries: [
+          {
+            type: "interval",
+            startMs: new Date(2026, 1, 8, 9, 0).getTime(),
+            endMs: new Date(2026, 1, 8, 9, 20).getTime(),
+            source: "timer",
+          },
+          {
+            type: "legacy-total",
+            durationMs: 10 * 60 * 1000,
+            source: "import",
+          },
+          {
+            type: "manual-adjustment",
+            deltaMs: 5 * 60 * 1000,
+            source: "manual-edit",
+          },
+        ],
+      },
+    },
+  }).days;
+
+  assert.equal(trackerCore.clearDayEntries(days, "2026-02-08"), true);
+  assert.equal(days["2026-02-08"], undefined);
+}
+
+{
+  const backup = trackerCore.createBackupPayload({
+    days: {
+      "2026-02-09": {
+        entries: [{
+          type: "manual-adjustment",
+          deltaMs: 20 * 60 * 1000,
+          source: "manual-edit",
+        }],
+      },
+    },
+  });
+  const imported = trackerStorage.normalizeImportedSnapshot(backup);
+
+  assert.equal(trackerCore.getDayManualAdjustmentMs(imported.days, "2026-02-09"), 20 * 60 * 1000);
+  assert.equal(trackerCore.getDayEffectiveWorkMs(imported.days, "2026-02-09"), 20 * 60 * 1000);
+}
+
+{
+  const days = trackerCore.createPersistedState({
+    days: {
+      "2026-02-10": {
+        entries: [
+          {
+            type: "manual-adjustment",
+            deltaMs: 15 * 60 * 1000,
+            source: "manual-edit",
+          },
+          {
+            type: "interval",
+            startMs: new Date(2026, 1, 10, 12, 0).getTime(),
+            endMs: new Date(2026, 1, 10, 13, 0).getTime(),
+            source: "timer",
+          },
+          {
+            type: "legacy-total",
+            durationMs: 30 * 60 * 1000,
+            source: "import",
+          },
+          {
+            type: "interval",
+            startMs: new Date(2026, 1, 10, 9, 0).getTime(),
+            endMs: new Date(2026, 1, 10, 10, 0).getTime(),
+            source: "timer",
+          },
+        ],
+      },
+    },
+  }).days;
+
+  assert.deepEqual(trackerCore.getDayIntervalDurations(days, "2026-02-10"), [60 * 60 * 1000, 60 * 60 * 1000]);
+  assert.equal(trackerCore.getDayIntervalCount(days, "2026-02-10"), 2);
+  assert.equal(trackerCore.getDayIntervalWorkMs(days, "2026-02-10"), 2 * 60 * 60 * 1000);
+  assert.equal(trackerCore.getDayLegacyTotalMs(days, "2026-02-10"), 30 * 60 * 1000);
+  assert.deepEqual(
+    trackerCore.getDisplayEntriesForDay(days, "2026-02-10").map((entry) => entry.type),
+    ["interval", "interval", "legacy-total", "manual-adjustment"],
+  );
+}
