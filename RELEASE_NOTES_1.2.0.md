@@ -1,5 +1,3 @@
-# Worktime Tracker 1.2.0
-
 This release rebuilds the app's foundation so the tracker is more stable, more predictable, and ready to grow without brittle workarounds.
 
 ## What changed
