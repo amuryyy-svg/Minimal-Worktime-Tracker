@@ -86,6 +86,13 @@ body {
   font-family: var(--font-ui);
 }
 
+.window-shell,
+.window-shell * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
 button,
 .no-drag {
   app-region: no-drag;
@@ -717,11 +724,21 @@ button,
   -webkit-app-region: no-drag;
   width: min(100%, 432px);
   max-width: 432px;
+  max-height: calc(100vh - 36px);
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--shell);
   box-shadow: var(--panel-shadow);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.day-menu-panel,
+.day-menu-panel * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .tile-dialog {
@@ -770,6 +787,16 @@ button,
 .settings-body.day-menu-body {
   gap: 0;
   padding: 0;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.settings-body.day-menu-body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .tile-dialog .day-menu-body {
@@ -1117,6 +1144,10 @@ button,
   border-radius: 0;
   background: var(--shell);
   box-shadow: 0 14px 30px rgb(0 0 0 / 0.08);
+}
+
+.day-menu-panel.tile-dialog {
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .settings-header {

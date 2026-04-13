@@ -563,6 +563,29 @@
     return true;
   }
 
+  function appendOrExtendIntervalToDayRecord(dayRecord, startMs, endMs, source) {
+    const lastEntry = dayRecord.entries[dayRecord.entries.length - 1];
+    if (
+      isPlainObject(lastEntry) &&
+      lastEntry.type === ENTRY_TYPE_INTERVAL &&
+      sanitizeEntrySource(lastEntry.source, DEFAULT_INTERVAL_SOURCE) === source
+    ) {
+      const lastEndMs = Math.trunc(Number(lastEntry.endMs));
+      if (Number.isFinite(lastEndMs) && lastEndMs >= startMs) {
+        lastEntry.endMs = Math.max(lastEndMs, endMs);
+        lastEntry.source = source;
+        return;
+      }
+    }
+
+    dayRecord.entries.push({
+      type: ENTRY_TYPE_INTERVAL,
+      startMs,
+      endMs,
+      source,
+    });
+  }
+
   function getBusinessDayBoundsForInstant(date, dayRolloverTime = DEFAULT_DAY_ROLLOVER_TIME) {
     const dayDate = getBusinessDayDateFromInstant(date, dayRolloverTime);
     const bounds = getBusinessDayBoundsForLabelDate(dayDate, dayRolloverTime);
@@ -600,12 +623,7 @@
       const dayRecord = ensureDayRecord(days, currentDay.dayKey);
 
       if (dayRecord && segmentEndMs > cursorMs) {
-        dayRecord.entries.push({
-          type: ENTRY_TYPE_INTERVAL,
-          startMs: cursorMs,
-          endMs: segmentEndMs,
-          source: normalizedSource,
-        });
+        appendOrExtendIntervalToDayRecord(dayRecord, cursorMs, segmentEndMs, normalizedSource);
       }
 
       cursorMs = segmentEndMs;

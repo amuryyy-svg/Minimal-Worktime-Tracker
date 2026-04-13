@@ -18,33 +18,62 @@
   function createTimerRuntime(initialState = {}) {
     return {
       isRunning: Boolean(initialState.isRunning),
-      lastTickMs: null,
+      segmentStartMs: null,
       isSuspended: Boolean(initialState.isSuspended),
     };
   }
 
   function applyPersistedTimerState(runtime, timerState = {}) {
     runtime.isRunning = Boolean(timerState?.isRunning);
-    runtime.lastTickMs = null;
+    runtime.segmentStartMs = null;
     runtime.isSuspended = false;
     return runtime;
   }
 
-  function getLiveWorkMs(runtime, date, options = {}) {
-    if (!runtime.isRunning || runtime.lastTickMs === null || runtime.isSuspended) {
-      return 0;
+  function getActiveSegmentBounds(runtime, date, options = {}) {
+    if (!runtime.isRunning || runtime.segmentStartMs === null || runtime.isSuspended) {
+      return null;
     }
 
     const nowMs = resolveNowMs(options.nowMs);
     const dayBounds = trackerCore.getBusinessDayBoundsForLabelDate(date, options.dayRolloverTime);
-    const overlapStartMs = Math.max(runtime.lastTickMs, dayBounds.startMs);
+    const overlapStartMs = Math.max(runtime.segmentStartMs, dayBounds.startMs);
     const overlapEndMs = Math.min(nowMs, dayBounds.endMs);
 
-    return Math.max(0, overlapEndMs - overlapStartMs);
+    if (overlapEndMs <= overlapStartMs) {
+      return null;
+    }
+
+    return {
+      startMs: overlapStartMs,
+      endMs: overlapEndMs,
+      durationMs: overlapEndMs - overlapStartMs,
+    };
+  }
+
+  function getLiveWorkMs(runtime, date, options = {}) {
+    const bounds = getActiveSegmentBounds(runtime, date, options);
+    return bounds ? bounds.durationMs : 0;
+  }
+
+  function getLiveSessionEntry(runtime, date, options = {}) {
+    const bounds = getActiveSegmentBounds(runtime, date, options);
+
+    if (!bounds) {
+      return null;
+    }
+
+    return {
+      type: "interval",
+      startMs: bounds.startMs,
+      endMs: bounds.endMs,
+      durationMs: bounds.durationMs,
+      source: options.source ?? "timer",
+    };
   }
 
   function flushTimer(runtime, days, options = {}) {
-    if (!runtime.isRunning || runtime.lastTickMs === null) {
+    if (!runtime.isRunning || runtime.segmentStartMs === null) {
       return false;
     }
 
@@ -53,10 +82,10 @@
     }
 
     const nowMs = resolveNowMs(options.nowMs);
-    const changed = trackerCore.addIntervalToDays(days, runtime.lastTickMs, nowMs, options.source ?? "timer", {
+    const changed = trackerCore.addIntervalToDays(days, runtime.segmentStartMs, nowMs, options.source ?? "timer", {
       dayRolloverTime: options.dayRolloverTime,
     });
-    runtime.lastTickMs = nowMs;
+    runtime.segmentStartMs = nowMs;
     return changed;
   }
 
@@ -66,7 +95,8 @@
     }
 
     runtime.isRunning = true;
-    runtime.lastTickMs = resolveNowMs(options.nowMs);
+    runtime.isSuspended = false;
+    runtime.segmentStartMs = resolveNowMs(options.nowMs);
     return true;
   }
 
@@ -77,7 +107,8 @@
     });
 
     runtime.isRunning = false;
-    runtime.lastTickMs = null;
+    runtime.segmentStartMs = null;
+    runtime.isSuspended = false;
     return changed;
   }
 
@@ -91,6 +122,7 @@
       allowWhileSuspended: true,
     });
 
+    runtime.segmentStartMs = null;
     runtime.isSuspended = true;
     return changed;
   }
@@ -103,7 +135,7 @@
     runtime.isSuspended = false;
 
     if (runtime.isRunning) {
-      runtime.lastTickMs = resolveNowMs(options.nowMs);
+      runtime.segmentStartMs = resolveNowMs(options.nowMs);
     }
 
     return true;
@@ -114,6 +146,7 @@
     createTimerRuntime,
     flushTimer,
     getLiveWorkMs,
+    getLiveSessionEntry,
     handleSystemPause,
     handleSystemResume,
     startTimer,

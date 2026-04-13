@@ -47,7 +47,7 @@ const LANGUAGE_PACKS = {
     importBackup: "\u0418\u043c\u043f\u043e\u0440\u0442",
     exportBackup: "\u042d\u043a\u0441\u043f\u043e\u0440\u0442",
     exportFailed: "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u044d\u043a\u0441\u043f\u043e\u0440\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0431\u044d\u043a\u0430\u043f.",
-    importConfirm: "\u0418\u043c\u043f\u043e\u0440\u0442 \u0437\u0430\u043c\u0435\u043d\u0438\u0442 \u0442\u0435\u043a\u0443\u0449\u0438\u0435 \u0434\u0430\u043d\u043d\u044b\u0435. \u041f\u0440\u043e\u0434\u043e\u043b\u0436\u0438\u0442\u044c?",
+    importConfirm: "\u0418\u043c\u043f\u043e\u0440\u0442 \u0437\u0430\u043c\u0435\u043d\u0438\u0442 \u0442\u0435\u043a\u0443\u0449\u0438\u0439 \u043f\u0440\u043e\u0433\u0440\u0435\u0441\u0441, \u043d\u043e \u043e\u0441\u0442\u0430\u0432\u0438\u0442 \u0442\u0435\u043c\u0443 \u0438 \u043d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438. \u041f\u0440\u043e\u0434\u043e\u043b\u0436\u0438\u0442\u044c?",
     importSuccess: "\u0411\u044d\u043a\u0430\u043f \u0432\u043e\u0441\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d.",
     importFailed: "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0432\u043e\u0441\u0441\u0442\u0430\u043d\u043e\u0432\u0438\u0442\u044c \u0431\u044d\u043a\u0430\u043f.",
     settingsTitle: "\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438",
@@ -159,7 +159,7 @@ const LANGUAGE_PACKS = {
     importBackup: "Import",
     exportBackup: "Export",
     exportFailed: "Unable to export backup.",
-    importConfirm: "Import will replace the current data. Continue?",
+    importConfirm: "Import will replace the current progress, but keep the current theme and settings. Continue?",
     importSuccess: "Backup restored.",
     importFailed: "Unable to restore backup.",
     settingsTitle: "Settings",
@@ -293,7 +293,6 @@ LANGUAGE_PACKS.ru.dayDetailsAdjustmentLabel = "Корректировка";
 LANGUAGE_PACKS.ru.dayDetailsLiveLabel = "Текущая сессия";
 LANGUAGE_PACKS.ru.dayDetailsEmpty = "Сохранённых записей за этот день пока нет.";
 LANGUAGE_PACKS.ru.dayEntryIntervalKind = "Интервал";
-LANGUAGE_PACKS.ru.dayEntryIntervalNote = "Реальная сессия таймера. Редактирование интервала в этой фазе недоступно.";
 LANGUAGE_PACKS.ru.dayEntryLegacyKind = "Импорт";
 LANGUAGE_PACKS.ru.dayEntryLegacyTitle = "Мигрированный итог";
 LANGUAGE_PACKS.ru.dayEntryLegacyNote = "Импортированное или мигрированное агрегированное время без точного диапазона.";
@@ -322,7 +321,6 @@ LANGUAGE_PACKS.en.dayDetailsAdjustmentLabel = "Adjustment";
 LANGUAGE_PACKS.en.dayDetailsLiveLabel = "Live session";
 LANGUAGE_PACKS.en.dayDetailsEmpty = "There are no saved entries for this day yet.";
 LANGUAGE_PACKS.en.dayEntryIntervalKind = "Interval";
-LANGUAGE_PACKS.en.dayEntryIntervalNote = "Real timer session. Direct interval editing is not available in this phase.";
 LANGUAGE_PACKS.en.dayEntryLegacyKind = "Import";
 LANGUAGE_PACKS.en.dayEntryLegacyTitle = "Migrated total";
 LANGUAGE_PACKS.en.dayEntryLegacyNote = "Imported or migrated aggregate time without an exact clock range.";
@@ -715,6 +713,14 @@ function applyPersistedState(nextState, bootstrapState = null) {
   syncSettingsState();
 }
 
+function applyImportedProgress(importedState) {
+  days = importedState.days;
+  closeDayMenuOverlay({ returnFocus: false });
+  closeManualEditOverlay({ returnFocus: false });
+  flushSave();
+  renderAll();
+}
+
 
 function scheduleSave() {
   if (saveTimeout) {
@@ -899,6 +905,12 @@ function getLiveWorkMs(date) {
   });
 }
 
+function getLiveDisplayEntryForDate(date) {
+  return trackerTimer.getLiveSessionEntry(timerState, date, {
+    dayRolloverTime: settings.dayRolloverTime,
+  });
+}
+
 function getStoredWorkMsForDate(date) {
   return trackerCore.getWorkMsForDate(days, date);
 }
@@ -916,7 +928,20 @@ function getStoredManualAdjustmentMsForDate(date) {
 }
 
 function getDisplayEntriesForDate(date) {
-  return trackerCore.getDisplayEntriesForDay(days, date);
+  const displayEntries = trackerCore.getDisplayEntriesForDay(days, date);
+  const liveEntry = getLiveDisplayEntryForDate(date);
+
+  if (liveEntry) {
+    const insertIndex = displayEntries.findIndex((entry) => entry.type !== "interval");
+
+    if (insertIndex === -1) {
+      displayEntries.push(liveEntry);
+    } else {
+      displayEntries.splice(insertIndex, 0, liveEntry);
+    }
+  }
+
+  return displayEntries;
 }
 
 function formatClockTime(timestampMs) {
@@ -1333,7 +1358,7 @@ function createDayEntryElement(entry) {
     kind.textContent = ui.dayEntryIntervalKind;
     title.textContent = `${formatClockTime(entry.startMs)} - ${formatClockTime(entry.endMs)}`;
     value.textContent = formatDetailedWork(entry.durationMs);
-    note.textContent = ui.dayEntryIntervalNote;
+    note.hidden = true;
     applyValueTone(value, entry.durationMs);
   } else if (entry.type === "legacy-total") {
     item.classList.add("day-entry--legacy");
@@ -2306,8 +2331,8 @@ el.importBackup.addEventListener("click", async () => {
       return;
     }
 
-    const bootstrapState = await getBootstrapState();
-    applyPersistedState(trackerStorage.normalizeImportedSnapshot(result.snapshot), bootstrapState);
+    const importedState = trackerStorage.normalizeImportedSnapshot(result.snapshot);
+    applyImportedProgress(importedState);
     showAppToast(getUiText().importSuccess, "success");
   } catch (error) {
     console.error("Unable to import backup.", error);
@@ -2360,7 +2385,6 @@ setInterval(() => {
     return;
   }
 
-  flushTick();
   renderCore();
   syncTrayState();
 }, 1000);

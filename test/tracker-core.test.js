@@ -229,6 +229,128 @@ function getDayWorkMs(days, date) {
 }
 
 {
+  const days = {};
+  const runtime = trackerTimer.createTimerRuntime();
+  const start = new Date(2026, 0, 15, 8, 0).getTime();
+  const pauseTick = start + 36 * 60 * 1000;
+  const resumeTick = pauseTick + 5 * 60 * 1000;
+  const stopTick = resumeTick + 14 * 60 * 1000;
+
+  assert.equal(trackerTimer.startTimer(runtime, { nowMs: start }), true);
+  assert.equal(trackerTimer.getLiveWorkMs(runtime, new Date(2026, 0, 15, 8, 0), {
+    nowMs: pauseTick,
+    dayRolloverTime: "06:00",
+  }), 36 * 60 * 1000);
+  assert.deepEqual(trackerTimer.getLiveSessionEntry(runtime, new Date(2026, 0, 15, 8, 0), {
+    nowMs: pauseTick,
+    dayRolloverTime: "06:00",
+  }), {
+    type: "interval",
+    startMs: start,
+    endMs: pauseTick,
+    durationMs: 36 * 60 * 1000,
+    source: "timer",
+  });
+
+  assert.equal(trackerTimer.handleSystemPause(runtime, days, {
+    nowMs: pauseTick,
+    dayRolloverTime: "06:00",
+  }), true);
+  assert.equal(trackerCore.getDayIntervalCount(days, "2026-01-15"), 1);
+  assert.equal(trackerCore.getDayIntervalWorkMs(days, "2026-01-15"), 36 * 60 * 1000);
+  assert.equal(trackerTimer.getLiveWorkMs(runtime, new Date(2026, 0, 15, 8, 0), {
+    nowMs: pauseTick,
+    dayRolloverTime: "06:00",
+  }), 0);
+  assert.equal(trackerTimer.getLiveSessionEntry(runtime, new Date(2026, 0, 15, 8, 0), {
+    nowMs: pauseTick,
+    dayRolloverTime: "06:00",
+  }), null);
+
+  assert.equal(trackerTimer.handleSystemResume(runtime, {
+    nowMs: resumeTick,
+  }), true);
+  assert.equal(trackerTimer.getLiveWorkMs(runtime, new Date(2026, 0, 15, 8, 0), {
+    nowMs: stopTick,
+    dayRolloverTime: "06:00",
+  }), 14 * 60 * 1000);
+  assert.deepEqual(trackerTimer.getLiveSessionEntry(runtime, new Date(2026, 0, 15, 8, 0), {
+    nowMs: stopTick,
+    dayRolloverTime: "06:00",
+  }), {
+    type: "interval",
+    startMs: resumeTick,
+    endMs: stopTick,
+    durationMs: 14 * 60 * 1000,
+    source: "timer",
+  });
+
+  assert.equal(trackerTimer.stopTimer(runtime, days, {
+    nowMs: stopTick,
+    dayRolloverTime: "06:00",
+  }), true);
+  assert.equal(trackerCore.getDayIntervalCount(days, "2026-01-15"), 2);
+  assert.equal(trackerCore.getDayIntervalWorkMs(days, "2026-01-15"), 50 * 60 * 1000);
+  assert.equal(trackerTimer.getLiveWorkMs(runtime, new Date(2026, 0, 15, 8, 0), {
+    nowMs: stopTick,
+    dayRolloverTime: "06:00",
+  }), 0);
+}
+
+{
+  const days = {};
+  const runtime = trackerTimer.createTimerRuntime();
+  const start = new Date(2026, 0, 17, 8, 0).getTime();
+  const pauseTick = start + 5 * 60 * 1000;
+
+  assert.equal(trackerTimer.startTimer(runtime, { nowMs: start }), true);
+  assert.equal(trackerTimer.handleSystemPause(runtime, days, {
+    nowMs: pauseTick,
+    dayRolloverTime: "06:00",
+  }), true);
+  assert.equal(trackerTimer.stopTimer(runtime, days, {
+    nowMs: pauseTick,
+    dayRolloverTime: "06:00",
+  }), false);
+}
+
+{
+  const days = {};
+  const runtime = trackerTimer.createTimerRuntime();
+  const start = new Date(2026, 0, 16, 9, 0).getTime();
+  const flushTick = start + 10 * 60 * 1000;
+  const stopTick = start + 15 * 60 * 1000;
+
+  assert.equal(trackerTimer.startTimer(runtime, { nowMs: start }), true);
+  assert.equal(trackerTimer.flushTimer(runtime, days, {
+    nowMs: flushTick,
+    dayRolloverTime: "06:00",
+  }), true);
+  assert.equal(trackerCore.getDayIntervalCount(days, "2026-01-16"), 1);
+  assert.equal(trackerCore.getDayIntervalWorkMs(days, "2026-01-16"), 10 * 60 * 1000);
+  assert.equal(trackerTimer.getLiveWorkMs(runtime, new Date(2026, 0, 16, 9, 0), {
+    nowMs: stopTick,
+    dayRolloverTime: "06:00",
+  }), 5 * 60 * 1000);
+  assert.deepEqual(trackerTimer.getLiveSessionEntry(runtime, new Date(2026, 0, 16, 9, 0), {
+    nowMs: stopTick,
+    dayRolloverTime: "06:00",
+  }), {
+    type: "interval",
+    startMs: flushTick,
+    endMs: stopTick,
+    durationMs: 5 * 60 * 1000,
+    source: "timer",
+  });
+  assert.equal(trackerTimer.stopTimer(runtime, days, {
+    nowMs: stopTick,
+    dayRolloverTime: "06:00",
+  }), true);
+  assert.equal(trackerCore.getDayIntervalCount(days, "2026-01-16"), 1);
+  assert.equal(trackerCore.getDayIntervalWorkMs(days, "2026-01-16"), 15 * 60 * 1000);
+}
+
+{
   const persisted = trackerCore.createPersistedState({
     days: {
       "2026-02-01": {
@@ -639,7 +761,7 @@ function getDayWorkMs(days, date) {
   const resumed = trackerTimer.handleSystemResume(runtime, { nowMs: resumeMs });
   assert.equal(resumed, true);
   assert.equal(runtime.isSuspended, false);
-  assert.equal(runtime.lastTickMs, resumeMs);
+  assert.equal(runtime.segmentStartMs, resumeMs);
 
   const stopped = trackerTimer.stopTimer(runtime, days, { nowMs: endMs, source: "timer" });
   assert.equal(stopped, true);

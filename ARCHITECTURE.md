@@ -82,8 +82,9 @@ The persisted format is `v8` and uses day records instead of `logs[dateKey].work
 ## Timer Flow
 
 - Live runtime timer state is not restored as a running session on cold start.
-- On flush, timer time is written as `interval` entries via `tracker-timer` and `tracker-core`.
-- If a session crosses the configured day rollover boundary, it is split into separate per-day interval entries before persistence.
+- While a timer is running, the active segment stays in renderer memory and is rendered directly in the UI as the live session.
+- The active segment is committed to `days` only when the segment ends or a structural snapshot is needed, such as stop, system pause, rollover change, export, or clearing a past day.
+- If a committed segment crosses the configured day rollover boundary, `tracker-core` splits it into separate per-day interval entries before persistence.
 
 ## Effective Totals
 
@@ -95,13 +96,13 @@ The persisted format is `v8` and uses day records instead of `logs[dateKey].work
 ## Day Menu UI Flow
 
 - `src/renderer/app.js` renders selected-day actions inline and opens a compact `day menu` popup for per-day detail inspection.
-- The day menu distinguishes real timer intervals, migrated/imported aggregate totals, and manual adjustments via `trackerCore.getDisplayEntriesForDay(...)`.
+- The day menu combines stored entries from `trackerCore.getDisplayEntriesForDay(...)` with the current live timer segment from `trackerTimer.getLiveSessionEntry(...)` before rendering.
 - Manual editing opens a dedicated in-window overlay from the day menu and saves through `trackerCore.setDayManualTotal(...)`.
 - The overlay edits the desired day total in minute precision and lets the domain layer derive the resulting `manual-adjustment`.
 
 ## Backup Contract
 
-- Renderer exports and imports full snapshots.
+- Renderer exports full snapshots. Import applies only day progress and keeps local settings intact, including theme.
 - Global import/export entry points live in `Settings > Data`; selected-day actions no longer host backup controls.
 - `tracker-storage` accepts two import shapes: full `v8` persisted snapshots (`version`, `days`, `settings`, `timerState`) and legacy `logs` snapshots.
 - When `minimal-worktime-tracker.v8` is malformed, storage loading ignores it and continues fallback lookup through `v7 ... v1`.
