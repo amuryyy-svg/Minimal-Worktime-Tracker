@@ -21,8 +21,9 @@
   const DEFAULT_WEEK_START = "monday";
   const DEFAULT_THEME = "light";
   const DEFAULT_DAY_ROLLOVER_TIME = "06:00";
+  const DEFAULT_TIME_FORMAT = "24h";
   const DAY_ROLLOVER_TIME_PATTERN = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
-  const PERSISTED_STATE_VERSION = 8;
+  const PERSISTED_STATE_VERSION = 9;
 
   function isPlainObject(value) {
     return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -203,6 +204,18 @@
     return fallback;
   }
 
+  function getDefaultTimeFormatForLanguage(language) {
+    return language === "en" ? "ampm" : "24h";
+  }
+
+  function sanitizeTimeFormat(value, fallback = DEFAULT_TIME_FORMAT) {
+    if (value === "24h" || value === "ampm") {
+      return value;
+    }
+
+    return fallback;
+  }
+
 
   function sanitizeDayRolloverTime(value, fallback = DEFAULT_DAY_ROLLOVER_TIME) {
     const normalizedFallback = DAY_ROLLOVER_TIME_PATTERN.test(fallback)
@@ -354,6 +367,9 @@
     const fallbackTheme = sanitizeTheme(normalizedFallback.theme, DEFAULT_THEME);
     const fallbackAutostart = sanitizeBoolean(normalizedFallback.autostart, false);
     const fallbackAutoBackup = sanitizeBoolean(normalizedFallback.autoBackup, false);
+    const sourceLanguage = source.language === undefined
+      ? fallbackLanguage
+      : sanitizeLanguage(source.language, fallbackLanguage);
 
     return {
       dailyTargetHours: sanitizeDailyTargetHours(
@@ -368,12 +384,13 @@
       dayOverrides: source.dayOverrides === undefined
         ? fallbackDayOverrides
         : sanitizeDayOverrides(source.dayOverrides),
-      language: source.language === undefined
-        ? fallbackLanguage
-        : sanitizeLanguage(source.language, fallbackLanguage),
+      language: sourceLanguage,
       dateFormat: source.dateFormat === undefined
         ? fallbackDateFormat
         : sanitizeDateFormat(source.dateFormat, fallbackDateFormat),
+      timeFormat: source.timeFormat === undefined
+        ? getDefaultTimeFormatForLanguage(sourceLanguage)
+        : sanitizeTimeFormat(source.timeFormat, getDefaultTimeFormatForLanguage(sourceLanguage)),
       weekStart: source.weekStart === undefined
         ? fallbackWeekStart
         : sanitizeWeekStart(source.weekStart, fallbackWeekStart),
@@ -465,6 +482,7 @@
       dayOverrides: {},
       language: DEFAULT_LANGUAGE,
       dateFormat: DEFAULT_DATE_FORMAT,
+      timeFormat: getDefaultTimeFormatForLanguage(DEFAULT_LANGUAGE),
       weekStart: DEFAULT_WEEK_START,
       dayRolloverTime: DEFAULT_DAY_ROLLOVER_TIME,
       theme: DEFAULT_THEME,
@@ -1232,6 +1250,7 @@
     sanitizeSettings,
     sanitizeTheme,
     sanitizeTimerState,
+    sanitizeTimeFormat,
     sanitizeWeekStart,
     sanitizeWeekendDays,
     setDayManualTotal,
@@ -1239,6 +1258,7 @@
     startOfDay,
     startOfMonth,
     sumDayEntries,
+    getDefaultTimeFormatForLanguage,
     PERSISTED_STATE_VERSION,
   };
 });

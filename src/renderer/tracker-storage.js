@@ -13,6 +13,7 @@
   const STORAGE_KEY = `minimal-worktime-tracker.v${trackerCore.PERSISTED_STATE_VERSION}`;
   const LEGACY_STORAGE_KEYS = [
     STORAGE_KEY,
+    "minimal-worktime-tracker.v8",
     "minimal-worktime-tracker.v7",
     "minimal-worktime-tracker.v6",
     "minimal-worktime-tracker.v5",
@@ -47,7 +48,8 @@
   function isCurrentPersistedSnapshot(snapshot) {
     return (
       isPlainObject(snapshot) &&
-      snapshot.version === trackerCore.PERSISTED_STATE_VERSION &&
+      Number.isInteger(snapshot.version) &&
+      snapshot.version > 0 &&
       hasOwn(snapshot, "days") &&
       isPlainObject(snapshot.days) &&
       hasOwn(snapshot, "settings") &&
@@ -65,13 +67,10 @@
     return isCurrentPersistedSnapshot(snapshot) || isLegacyLogsSnapshot(snapshot);
   }
 
-  function parseRecognizedSnapshot(raw, storageKey) {
+  function parseRecognizedSnapshot(raw) {
     const parsed = JSON.parse(raw);
 
-    const isRecognized = storageKey === STORAGE_KEY
-      ? isCurrentPersistedSnapshot(parsed)
-      : isLegacyLogsSnapshot(parsed);
-    if (!isRecognized) {
+    if (!isRecognizedSnapshotShape(parsed)) {
       return null;
     }
 
@@ -89,7 +88,7 @@
           continue;
         }
 
-        const persistedState = parseRecognizedSnapshot(raw, key);
+        const persistedState = parseRecognizedSnapshot(raw);
         if (persistedState) {
           return persistedState;
         }

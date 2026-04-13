@@ -59,6 +59,9 @@ const LANGUAGE_PACKS = {
     languageLabel: "\u042f\u0437\u044b\u043a",
     languageRu: "\u0420\u0443\u0441\u0441\u043a\u0438\u0439",
     languageEn: "English",
+    timeFormatLabel: "\u0424\u043e\u0440\u043c\u0430\u0442 \u0432\u0440\u0435\u043c\u0435\u043d\u0438",
+    timeFormat24h: "24 \u0447",
+    timeFormatAmpm: "AM/PM",
     minimizeLabel: "\u0421\u0432\u0435\u0440\u043d\u0443\u0442\u044c",
     closeLabel: "\u0417\u0430\u043a\u0440\u044b\u0442\u044c",
     dayOffLabel: "\u0432\u044b\u0445\u043e\u0434\u043d\u043e\u0439",
@@ -171,6 +174,9 @@ const LANGUAGE_PACKS = {
     languageLabel: "Language",
     languageRu: "Russian",
     languageEn: "English",
+    timeFormatLabel: "Time format",
+    timeFormat24h: "24h",
+    timeFormatAmpm: "AM/PM",
     minimizeLabel: "Minimize",
     closeLabel: "Close",
     dayOffLabel: "day off",
@@ -346,6 +352,9 @@ const DEFAULT_DAILY_TARGET_HOURS = 6;
 const MIN_DAILY_TARGET_HOURS = 1;
 const MAX_DAILY_TARGET_HOURS = 24;
 const DEFAULT_WEEKEND_DAYS = [0, 6];
+const TIMER_DIGIT_REPEAT_COUNT = 3;
+const TIMER_DIGIT_CENTER_OFFSET = 10;
+const TIMER_DIGIT_ANIMATION_MS = 260;
 
 const el = {
   timerDisplay: document.getElementById("timer-display"),
@@ -390,6 +399,9 @@ const el = {
   settingsLanguageLabel: document.getElementById("settings-language-label"),
   settingsLanguageRu: document.getElementById("settings-language-ru"),
   settingsLanguageEn: document.getElementById("settings-language-en"),
+  settingsTimeFormatLabel: document.getElementById("settings-time-format-label"),
+  settingsTimeFormat24h: document.getElementById("settings-time-format-24h"),
+  settingsTimeFormatAmpm: document.getElementById("settings-time-format-ampm"),
   settingsThemeLabel: document.getElementById("settings-theme-label"),
   settingsThemeLight: document.getElementById("settings-theme-light"),
   settingsThemeAuto: document.getElementById("settings-theme-auto"),
@@ -485,6 +497,12 @@ let confirmDialogReturnFocus = null;
 let dayMenuReturnFocus = null;
 let manualEditState = null;
 const calendarCellRefs = new Map();
+const timerDisplayState = {
+  value: null,
+  signature: null,
+  visualRoot: null,
+  groups: [],
+};
 const systemThemeMediaQuery = typeof window.matchMedia === "function"
   ? window.matchMedia("(prefers-color-scheme: dark)")
   : null;
@@ -799,6 +817,12 @@ function syncCurrentDaySelection(now = new Date()) {
   return calendarCursorChanged;
 }
 
+function selectCurrentBusinessDay(now = new Date()) {
+  selectedDate = getCurrentBusinessDayDate(now);
+  selectedDateFollowsCurrentDay = true;
+  return selectedDate;
+}
+
 function getWeekStartIndex() {
   return settings.weekStart === "sunday" ? 0 : 1;
 }
@@ -851,6 +875,191 @@ function formatDuration(totalMs) {
 
 function formatDecimalHours(hours) {
   return (Math.round(hours * 10) / 10).toFixed(1);
+}
+
+function parseTimerDisplayParts(value) {
+  const [hours = "00", minutes = "00", seconds = "00"] = String(value).split(":");
+  return [hours, minutes, seconds];
+}
+
+function clearTimerDigitWheelTimeout(wheelState) {
+  if (!wheelState.resetTimeout) {
+    return;
+  }
+
+  clearTimeout(wheelState.resetTimeout);
+  wheelState.resetTimeout = null;
+}
+
+function clearTimerDisplayStructure() {
+  for (const groupState of timerDisplayState.groups) {
+    if (!groupState?.wheels) {
+      continue;
+    }
+
+    for (const wheelState of groupState.wheels) {
+      clearTimerDigitWheelTimeout(wheelState);
+    }
+  }
+
+  timerDisplayState.groups = [];
+  timerDisplayState.signature = null;
+  timerDisplayState.visualRoot = null;
+  el.timerDisplay.textContent = "";
+}
+
+function normalizeTimerDigit(rawDigit) {
+  const digit = Number.parseInt(String(rawDigit), 10);
+
+  if (!Number.isInteger(digit) || digit < 0 || digit > 9) {
+    return 0;
+  }
+
+  return digit;
+}
+
+function createTimerDigitWheel(initialDigit) {
+  const wheel = document.createElement("span");
+  wheel.className = "timer-wheel";
+
+  const track = document.createElement("span");
+  track.className = "timer-wheel-track";
+
+  for (let repeatIndex = 0; repeatIndex < TIMER_DIGIT_REPEAT_COUNT; repeatIndex += 1) {
+    for (let digit = 0; digit < 10; digit += 1) {
+      const digitCell = document.createElement("span");
+      digitCell.className = "timer-wheel-digit";
+      digitCell.textContent = String(digit);
+      track.appendChild(digitCell);
+    }
+  }
+
+  wheel.appendChild(track);
+
+  const digit = normalizeTimerDigit(initialDigit);
+  const wheelState = {
+    digit,
+    element: wheel,
+    resetTimeout: null,
+    track,
+  };
+
+  track.style.transform = `translate3d(0, -${TIMER_DIGIT_CENTER_OFFSET + digit}em, 0)`;
+  return wheelState;
+}
+
+function createTimerDigitGroup(partText) {
+  const group = document.createElement("span");
+  group.className = "timer-display-group";
+
+  const wheels = [];
+  for (const char of partText) {
+    const wheelState = createTimerDigitWheel(char);
+    wheels.push(wheelState);
+    group.appendChild(wheelState.element);
+  }
+
+  return {
+    element: group,
+    wheels,
+  };
+}
+
+function updateTimerDigitWheel(wheelState, nextDigit) {
+  const digit = normalizeTimerDigit(nextDigit);
+
+  if (wheelState.digit === digit) {
+    return;
+  }
+
+  clearTimerDigitWheelTimeout(wheelState);
+
+  const previousDigit = wheelState.digit;
+  let delta = (digit - previousDigit + 10) % 10;
+  if (delta > 5) {
+    delta -= 10;
+  }
+
+  wheelState.digit = digit;
+
+  const targetIndex = TIMER_DIGIT_CENTER_OFFSET + previousDigit + delta;
+  wheelState.track.style.transition = `transform ${TIMER_DIGIT_ANIMATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+  wheelState.track.style.transform = `translate3d(0, -${targetIndex}em, 0)`;
+
+  wheelState.resetTimeout = window.setTimeout(() => {
+    if (wheelState.digit !== digit) {
+      return;
+    }
+
+    wheelState.track.style.transition = "none";
+    wheelState.track.style.transform = `translate3d(0, -${TIMER_DIGIT_CENTER_OFFSET + digit}em, 0)`;
+    void wheelState.track.offsetHeight;
+    wheelState.track.style.transition = "";
+    wheelState.resetTimeout = null;
+  }, TIMER_DIGIT_ANIMATION_MS + 40);
+}
+
+function buildTimerDisplayStructure(parts) {
+  clearTimerDisplayStructure();
+
+  const visualRoot = document.createElement("span");
+  visualRoot.className = "timer-display-visual";
+  visualRoot.setAttribute("aria-hidden", "true");
+
+  timerDisplayState.groups = parts.map((partText, partIndex) => {
+    const groupState = createTimerDigitGroup(partText);
+    visualRoot.appendChild(groupState.element);
+
+    if (partIndex < parts.length - 1) {
+      const separator = document.createElement("span");
+      separator.className = "timer-display-separator";
+      separator.textContent = ":";
+      visualRoot.appendChild(separator);
+    }
+
+    return groupState;
+  });
+
+  timerDisplayState.visualRoot = visualRoot;
+  timerDisplayState.signature = parts.map((part) => part.length).join(":");
+  el.timerDisplay.setAttribute("aria-live", "off");
+  el.timerDisplay.appendChild(visualRoot);
+}
+
+function renderTimerDisplayValue(value) {
+  const normalizedValue = String(value);
+
+  if (timerDisplayState.visualRoot && timerDisplayState.value === normalizedValue) {
+    return;
+  }
+
+  const parts = parseTimerDisplayParts(normalizedValue);
+  const signature = parts.map((part) => part.length).join(":");
+
+  el.timerDisplay.setAttribute("aria-label", normalizedValue);
+
+  if (!timerDisplayState.visualRoot || timerDisplayState.signature !== signature || timerDisplayState.groups.length !== parts.length) {
+    buildTimerDisplayStructure(parts);
+    timerDisplayState.value = normalizedValue;
+    return;
+  }
+
+  for (let index = 0; index < parts.length; index += 1) {
+    const partText = parts[index];
+    const groupState = timerDisplayState.groups[index];
+
+    if (!groupState || groupState.wheels.length !== partText.length) {
+      buildTimerDisplayStructure(parts);
+      timerDisplayState.value = normalizedValue;
+      return;
+    }
+
+    for (let digitIndex = 0; digitIndex < partText.length; digitIndex += 1) {
+      updateTimerDigitWheel(groupState.wheels[digitIndex], partText[digitIndex]);
+    }
+  }
+
+  timerDisplayState.value = normalizedValue;
 }
 
 function formatCompactWork(totalMs) {
@@ -944,15 +1153,34 @@ function getDisplayEntriesForDate(date) {
   return displayEntries;
 }
 
+function getActiveTimeFormat() {
+  return trackerCore.sanitizeTimeFormat(
+    settings.timeFormat,
+    trackerCore.getDefaultTimeFormatForLanguage(settings.language),
+  );
+}
+
 function formatClockTime(timestampMs) {
   if (!Number.isFinite(timestampMs)) {
     return "--:--";
   }
 
-  return new Date(timestampMs).toLocaleTimeString(getUiText().locale, {
+  const timeFormat = getActiveTimeFormat();
+  const date = new Date(timestampMs);
+
+  if (timeFormat === "ampm") {
+    return new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }).format(date);
+  }
+
+  return new Intl.DateTimeFormat(getUiText().locale, {
     hour: "2-digit",
     minute: "2-digit",
-  });
+    hour12: false,
+  }).format(date);
 }
 
 function formatDayRolloverDisplayTime(dayRolloverTime, locale) {
@@ -962,20 +1190,21 @@ function formatDayRolloverDisplayTime(dayRolloverTime, locale) {
   );
   const [hoursText, minutesText] = normalizedDayRolloverTime.split(":");
   const previewDate = new Date(2000, 0, 1, Number(hoursText), Number(minutesText), 0, 0);
-  const timeFormatter = new Intl.DateTimeFormat(locale, {
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  const timeFormat = getActiveTimeFormat();
 
-  if (timeFormatter.resolvedOptions().hour12 === false) {
-    return new Intl.DateTimeFormat(locale, {
-      hour: "2-digit",
+  if (timeFormat === "ampm") {
+    return new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
       minute: "2-digit",
-      hour12: false,
+      hour12: true,
     }).format(previewDate);
   }
 
-  return timeFormatter.format(previewDate);
+  return new Intl.DateTimeFormat(locale, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(previewDate);
 }
 
 function shiftDayRolloverTime(dayRolloverTime, deltaMinutes) {
@@ -1289,6 +1518,9 @@ function renderStaticText() {
   el.settingsLanguageLabel.textContent = ui.languageLabel;
   el.settingsLanguageRu.textContent = ui.languageRu;
   el.settingsLanguageEn.textContent = ui.languageEn;
+  el.settingsTimeFormatLabel.textContent = ui.timeFormatLabel;
+  el.settingsTimeFormat24h.textContent = ui.timeFormat24h;
+  el.settingsTimeFormatAmpm.textContent = ui.timeFormatAmpm;
   el.settingsThemeLabel.textContent = ui.themeLabel;
   el.settingsThemeLight.textContent = ui.themeLight;
   el.settingsThemeAuto.textContent = ui.themeAuto;
@@ -1620,8 +1852,8 @@ function updateDailyTargetHours(rawValue) {
 }
 
 function renderTimer() {
-  const todayMs = getWorkMsForDate(getCurrentBusinessDayDate());
-  el.timerDisplay.textContent = formatDuration(todayMs);
+  const selectedDayMs = getWorkMsForDate(selectedDate);
+  renderTimerDisplayValue(formatDuration(selectedDayMs));
   el.timerPanel.setAttribute("aria-pressed", String(timerState.isRunning));
   el.timerPanel.classList.toggle("running", timerState.isRunning);
 }
@@ -1666,6 +1898,7 @@ function renderWeekendSettings() {
 function renderSettingsPanel() {
   const ui = getUiText();
   const isEnglish = settings.language === "en";
+  const timeFormat = getActiveTimeFormat();
   const theme = trackerCore.sanitizeTheme(settings.theme, DEFAULT_THEME);
   el.settingsThemeLight.classList.toggle("active", theme === "light");
   el.settingsThemeAuto.classList.toggle("active", theme === "auto");
@@ -1677,6 +1910,10 @@ function renderSettingsPanel() {
   el.settingsLanguageEn.classList.toggle("active", isEnglish);
   el.settingsLanguageRu.setAttribute("aria-pressed", String(!isEnglish));
   el.settingsLanguageEn.setAttribute("aria-pressed", String(isEnglish));
+  el.settingsTimeFormat24h.classList.toggle("active", timeFormat === "24h");
+  el.settingsTimeFormatAmpm.classList.toggle("active", timeFormat === "ampm");
+  el.settingsTimeFormat24h.setAttribute("aria-pressed", String(timeFormat === "24h"));
+  el.settingsTimeFormatAmpm.setAttribute("aria-pressed", String(timeFormat === "ampm"));
 
   const dateFormat = settings.dateFormat === "dmy" || settings.dateFormat === "mdy"
     ? settings.dateFormat
@@ -1822,6 +2059,23 @@ function setDateFormat(dateFormat) {
   }
 
   settings.dateFormat = nextDateFormat;
+  scheduleSave();
+  renderAll();
+  syncSettingsState();
+}
+
+function setTimeFormat(timeFormat) {
+  const nextTimeFormat = trackerCore.sanitizeTimeFormat(
+    timeFormat,
+    trackerCore.getDefaultTimeFormatForLanguage(settings.language),
+  );
+
+  if (settings.timeFormat === nextTimeFormat) {
+    renderSettingsPanel();
+    return;
+  }
+
+  settings.timeFormat = nextTimeFormat;
   scheduleSave();
   renderAll();
   syncSettingsState();
@@ -2149,7 +2403,7 @@ function toggleRun() {
       source: "timer",
     });
   } else {
-    const today = getCurrentBusinessDayDate();
+    const today = selectCurrentBusinessDay();
 
     if (trackerCore.shouldForceWorkOverrideOnTimerStart({
       isTimerRunning: timerState.isRunning,
@@ -2199,11 +2453,13 @@ el.dailyTargetHours.addEventListener("change", () => {
 el.settingsButton.addEventListener("click", toggleSettingsPanel);
 el.settingsClose.addEventListener("click", closeSettingsPanel);
 el.settingsBackdrop.addEventListener("click", closeSettingsPanel);
-el.settingsLanguageRu.addEventListener("click", () => setLanguage("ru"));
-el.settingsLanguageEn.addEventListener("click", () => setLanguage("en"));
-el.settingsThemeLight.addEventListener("click", () => setTheme("light"));
-el.settingsThemeAuto.addEventListener("click", () => setTheme("auto"));
-el.settingsThemeDark.addEventListener("click", () => setTheme("dark"));
+  el.settingsLanguageRu.addEventListener("click", () => setLanguage("ru"));
+  el.settingsLanguageEn.addEventListener("click", () => setLanguage("en"));
+  el.settingsTimeFormat24h.addEventListener("click", () => setTimeFormat("24h"));
+  el.settingsTimeFormatAmpm.addEventListener("click", () => setTimeFormat("ampm"));
+  el.settingsThemeLight.addEventListener("click", () => setTheme("light"));
+  el.settingsThemeAuto.addEventListener("click", () => setTheme("auto"));
+  el.settingsThemeDark.addEventListener("click", () => setTheme("dark"));
 el.settingsDateFormatLocalized.addEventListener("click", () => setDateFormat("localized"));
 el.settingsDateFormatDmy.addEventListener("click", () => setDateFormat("dmy"));
 el.settingsDateFormatMdy.addEventListener("click", () => setDateFormat("mdy"));

@@ -4,7 +4,7 @@
 
 The renderer is split into three layers:
 
-- `src/renderer/tracker-core.js`: pure domain logic for persisted-state normalization, `v7 -> v8` migration, interval splitting, `manual-adjustment` handling, day selectors, and streak calculations.
+- `src/renderer/tracker-core.js`: pure domain logic for persisted-state normalization, `v8 -> v9` migration, interval splitting, `manual-adjustment` handling, day selectors, and streak calculations.
 - `src/renderer/tracker-storage.js`: persistence boundary for `localStorage` keys and backup snapshot normalization.
 - `src/renderer/tracker-timer.js`: runtime timer behavior for start/stop/flush, suspend/resume, and live overlap calculations.
 - `src/renderer/app.js`: UI wiring, DOM access, event handlers, rendering, and Electron-facing coordination.
@@ -14,7 +14,7 @@ The renderer is split into three layers:
 
 ## Persisted State
 
-The persisted format is `v8` and uses day records instead of `logs[dateKey].workMs`.
+The persisted format is `v9` and uses day records instead of `logs[dateKey].workMs`.
 
 ```json
 {
@@ -47,6 +47,7 @@ The persisted format is `v8` and uses day records instead of `logs[dateKey].work
     "dayOverrides": {},
     "language": "ru",
     "dateFormat": "localized",
+    "timeFormat": "24h",
     "weekStart": "monday",
     "dayRolloverTime": "06:00",
     "theme": "auto",
@@ -69,11 +70,12 @@ The persisted format is `v8` and uses day records instead of `logs[dateKey].work
 - At most one non-zero `manual-adjustment` is kept per day after normalization/upsert.
 - Effective day totals are clamped to `>= 0`.
 - `settings.theme` accepts `light | dark | auto`; `auto` follows the OS color-scheme preference live.
+- `settings.timeFormat` accepts `24h | ampm` and is independent from language.
 - Empty days are not stored.
 
 ## Migration And Rollback
 
-- The app reads `minimal-worktime-tracker.v8` first, then legacy keys `v7 ... v1` as migration sources.
+- The app reads `minimal-worktime-tracker.v9` first, then `v8`, then legacy keys `v7 ... v1` as migration sources.
 - Legacy `logs[dateKey].workMs` values migrate to one `legacy-total` entry per day.
 - Legacy keys are not deleted during read-only migration.
 - `clear data` removes all supported storage keys.
@@ -85,6 +87,9 @@ The persisted format is `v8` and uses day records instead of `logs[dateKey].work
 - While a timer is running, the active segment stays in renderer memory and is rendered directly in the UI as the live session.
 - The active segment is committed to `days` only when the segment ends or a structural snapshot is needed, such as stop, system pause, rollover change, export, or clearing a past day.
 - If a committed segment crosses the configured day rollover boundary, `tracker-core` splits it into separate per-day interval entries before persistence.
+- The main timer face always renders the currently selected day, so a historical selection shows that day’s stored total in read-only mode.
+- Starting the timer from a historical selection first snaps the view back to the current business day and then starts the live session.
+- The timer face uses a wheel-style digit transition for visual updates; the underlying totals still come from the same day/time model.
 
 ## Effective Totals
 
@@ -104,6 +109,6 @@ The persisted format is `v8` and uses day records instead of `logs[dateKey].work
 
 - Renderer exports full snapshots. Import applies only day progress and keeps local settings intact, including theme.
 - Global import/export entry points live in `Settings > Data`; selected-day actions no longer host backup controls.
-- `tracker-storage` accepts two import shapes: full `v8` persisted snapshots (`version`, `days`, `settings`, `timerState`) and legacy `logs` snapshots.
-- When `minimal-worktime-tracker.v8` is malformed, storage loading ignores it and continues fallback lookup through `v7 ... v1`.
+- `tracker-storage` accepts two import shapes: full `v9` persisted snapshots (`version`, `days`, `settings`, `timerState`) and legacy `logs` snapshots.
+- When `minimal-worktime-tracker.v9` is malformed, storage loading ignores it and continues fallback lookup through `v8` and `v7 ... v1`.
 - Electron main/preload do not interpret tracker business data.

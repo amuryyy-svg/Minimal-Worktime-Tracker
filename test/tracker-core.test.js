@@ -87,12 +87,25 @@ function getDayWorkMs(days, date) {
   });
   assert.equal(persisted.settings.language, "en");
   assert.equal(persisted.settings.dateFormat, "mdy");
+  assert.equal(persisted.settings.timeFormat, "ampm");
   assert.equal(persisted.settings.weekStart, "sunday");
   assert.equal(persisted.settings.dayRolloverTime, "05:45");
   assert.equal(persisted.settings.theme, "dark");
   assert.equal(persisted.settings.autostart, true);
   assert.equal(persisted.settings.autoBackup, false);
   assert.equal(persisted.timerState.isRunning, true);
+}
+
+{
+  const persisted = trackerCore.createPersistedState({
+    settings: {
+      language: "ru",
+      timeFormat: "ampm",
+    },
+  });
+
+  assert.equal(persisted.settings.language, "ru");
+  assert.equal(persisted.settings.timeFormat, "ampm");
 }
 
 {
@@ -153,18 +166,28 @@ function getDayWorkMs(days, date) {
 
   assert.equal(trackerCore.getDayWorkMs(loaded.days, "2026-01-08"), 30 * 60 * 1000);
   assert.equal(loaded.settings.dayRolloverTime, "06:00");
+  assert.equal(loaded.settings.timeFormat, "24h");
 }
 
 {
   const fakeStorage = {
     values: new Map([
-      [trackerStorage.STORAGE_KEY, JSON.stringify({
+      ["minimal-worktime-tracker.v8", JSON.stringify({
         version: 8,
-        days: {},
-      })],
-      ["minimal-worktime-tracker.v7", JSON.stringify({
-        logs: {
-          "2026-01-09": { workMs: 25 * 60 * 1000 },
+        days: {
+          "2026-01-09": {
+            entries: [{
+              type: "legacy-total",
+              durationMs: 25 * 60 * 1000,
+              source: "import",
+            }],
+          },
+        },
+        settings: {
+          language: "en",
+        },
+        timerState: {
+          isRunning: false,
         },
       })],
     ]),
@@ -182,6 +205,32 @@ function getDayWorkMs(days, date) {
   const loaded = trackerStorage.loadPersistedState(fakeStorage);
 
   assert.equal(trackerCore.getDayWorkMs(loaded.days, "2026-01-09"), 25 * 60 * 1000);
+  assert.equal(loaded.settings.timeFormat, "ampm");
+}
+
+{
+  const fakeStorage = {
+    values: new Map([
+      ["minimal-worktime-tracker.v7", JSON.stringify({
+        logs: {
+          "2026-01-10": { workMs: 12 * 60 * 1000 },
+        },
+      })],
+    ]),
+    getItem(key) {
+      return this.values.has(key) ? this.values.get(key) : null;
+    },
+    removeItem(key) {
+      this.values.delete(key);
+    },
+    setItem(key, value) {
+      this.values.set(key, value);
+    },
+  };
+
+  const loaded = trackerStorage.loadPersistedState(fakeStorage);
+
+  assert.equal(trackerCore.getDayWorkMs(loaded.days, "2026-01-10"), 12 * 60 * 1000);
 }
 
 {
@@ -190,6 +239,12 @@ function getDayWorkMs(days, date) {
   assert.equal(trackerStorage.isRecognizedSnapshotShape({ days: {} }), false);
   assert.equal(trackerStorage.isRecognizedSnapshotShape({
     version: trackerCore.PERSISTED_STATE_VERSION,
+    days: {},
+    settings: {},
+    timerState: {},
+  }), true);
+  assert.equal(trackerStorage.isRecognizedSnapshotShape({
+    version: 8,
     days: {},
     settings: {},
     timerState: {},
@@ -537,6 +592,11 @@ function getDayWorkMs(days, date) {
 {
   assert.equal(trackerCore.sanitizeDateFormat("mdy"), "mdy");
   assert.equal(trackerCore.sanitizeDateFormat("bad"), "localized");
+  assert.equal(trackerCore.sanitizeTimeFormat("24h"), "24h");
+  assert.equal(trackerCore.sanitizeTimeFormat("ampm"), "ampm");
+  assert.equal(trackerCore.sanitizeTimeFormat("bad"), "24h");
+  assert.equal(trackerCore.getDefaultTimeFormatForLanguage("en"), "ampm");
+  assert.equal(trackerCore.getDefaultTimeFormatForLanguage("ru"), "24h");
   assert.equal(trackerCore.sanitizeWeekStart("sunday"), "sunday");
   assert.equal(trackerCore.sanitizeWeekStart("bad"), "monday");
   assert.equal(trackerCore.sanitizeDayRolloverTime("06:15"), "06:15");

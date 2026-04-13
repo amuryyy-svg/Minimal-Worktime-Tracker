@@ -1,6 +1,6 @@
 {
   "name": "minimal-worktime-tracker",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Minimal desktop tracker for work time, daily streaks and visible progress",
   "author": "Codex <codex@openai.com>",
   "main": "src/main.js",

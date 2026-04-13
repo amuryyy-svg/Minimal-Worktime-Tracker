@@ -263,13 +263,12 @@ function createWindow() {
     hideWindow();
   });
 
-  mainWindow.on("minimize", (event) => {
+  mainWindow.on("minimize", () => {
     if (isQuitting) {
       return;
     }
 
-    event.preventDefault();
-    hideWindow();
+    updateTrayMenu();
   });
 
   mainWindow.on("show", () => {
@@ -327,7 +326,11 @@ ipcMain.handle("autostart:set", (_event, enabled) => {
   );
 });
 ipcMain.on("window:minimize", () => {
-  hideWindow();
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return;
+  }
+
+  mainWindow.minimize();
 });
 
 ipcMain.on("window:close", () => {
